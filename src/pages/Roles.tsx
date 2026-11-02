@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Pencil, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
 import { api } from '../lib/api';
+import { isAdminHeadRole, isAdminHeadRoleCode } from '../lib/roles';
 
 type Row = Record<string, unknown> & { _id: string; name: string };
 function list(data: unknown): Row[] { return Array.isArray(data) ? data as Row[] : []; }
-function joined(value: unknown): string {
-  return Array.isArray(value) ? value.map((item) => typeof item === 'object' && item && 'code' in item ? String((item as Record<string, unknown>).code) : String(item)).join(', ') : '';
+function joined(value: unknown, excludeAdminHead = false): string {
+  return Array.isArray(value)
+    ? value.filter((item) => {
+      if (!excludeAdminHead) return true;
+      const code = typeof item === 'object' && item && 'code' in item ? (item as Record<string, unknown>).code : item;
+      return !isAdminHeadRoleCode(code);
+    }).map((item) => typeof item === 'object' && item && 'code' in item ? String((item as Record<string, unknown>).code) : String(item)).join(', ')
+    : '';
 }
 
 export default function Roles() {
@@ -24,7 +31,7 @@ export default function Roles() {
         api.get<unknown>('/roles'),
         api.get<unknown>('/roles/permissions'),
       ]);
-      setRoles(list(roleResult.data));
+      setRoles(list(roleResult.data).filter((role) => !isAdminHeadRole(role)));
       setPermissions(list(permissionResult.data));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load roles and permissions'); }
   }, []);
@@ -35,11 +42,20 @@ export default function Roles() {
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     const csv = (name: string) => String(values[name] ?? '').split(',').map((item) => item.trim()).filter(Boolean);
     const isRole = form === 'role';
+    const allowedChildRoleCodes = csv('allowedChildRoleCodes');
+    if (isRole && isAdminHeadRole({ code: values.code, name: values.name })) {
+      setError('The Admin Head role is not available in this project.');
+      return;
+    }
+    if (allowedChildRoleCodes.some(isAdminHeadRoleCode)) {
+      setError('Admin Head cannot be assigned as an allowed child role.');
+      return;
+    }
     const payload: Record<string, unknown> = isRole
       ? {
         name: values.name, code: values.code, description: values.description,
         level: Number(values.level), parentCode: values.parentCode,
-        permissionCodes: csv('permissionCodes'), allowedChildRoleCodes: csv('allowedChildRoleCodes'),
+        permissionCodes: csv('permissionCodes'), allowedChildRoleCodes,
       }
       : { module: values.module, action: values.action, description: values.description };
     if (editing && !isRole) return;
@@ -47,7 +63,7 @@ export default function Roles() {
     setError('');
     setNotice('');
     try {
-      if (editing) await api.patch(`/roles/${encodeURIComponent(editing._id)}`, { name: values.name, description: values.description, permissionCodes: csv('permissionCodes'), allowedChildRoleCodes: csv('allowedChildRoleCodes'), isActive: values.isActive === 'true' });
+      if (editing) await api.patch(`/roles/${encodeURIComponent(editing._id)}`, { name: values.name, description: values.description, permissionCodes: csv('permissionCodes'), allowedChildRoleCodes, isActive: values.isActive === 'true' });
       else if (isRole) await api.post('/roles', payload);
       else await api.post('/roles/permissions', payload);
       setNotice(editing ? 'Role updated.' : isRole ? 'Role created.' : 'Permission created.');
@@ -78,7 +94,7 @@ export default function Roles() {
           <label>Description<input name="description" maxLength={500} defaultValue={String(editing?.description ?? '')}/></label>
           {!editing && <><label>Hierarchy level<input name="level" type="number" min={0} max={100} required/></label><label>Parent role code<input name="parentCode" required/></label></>}
           <label className="field-wide">Permission codes (comma-separated)<input name="permissionCodes" defaultValue={joined(editing?.permissions)}/></label>
-          <label className="field-wide">Allowed child role codes (comma-separated)<input name="allowedChildRoleCodes" defaultValue={joined(editing?.allowedChildRoles)}/></label>
+          <label className="field-wide">Allowed child role codes (comma-separated)<input name="allowedChildRoleCodes" defaultValue={joined(editing?.allowedChildRoles, true)}/></label>
           {editing && <label>Active<select name="isActive" defaultValue={String(editing.isActive !== false)}><option value="true">Active</option><option value="false">Inactive</option></select></label>}
         </>}
       </div>

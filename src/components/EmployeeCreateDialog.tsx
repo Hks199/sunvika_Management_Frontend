@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../lib/api';
+import { isAdminHeadRole } from '../lib/roles';
 type Option={_id:string;name:string};
 function options(value:unknown):Option[]{if(Array.isArray(value))return value as Option[];if(value&&typeof value==='object'&&'data'in value&&Array.isArray((value as {data:unknown}).data))return (value as {data:Option[]}).data;return []}
 type RoleOption=Option&{code:string};
 function isRoleOption(value:unknown):value is RoleOption{if(!value||typeof value!=='object')return false;return '_id'in value&&'name'in value&&'code'in value&&typeof value._id==='string'&&typeof value.name==='string'&&typeof value.code==='string'}
-function roleOptions(value:unknown):RoleOption[]{return Array.isArray(value)?value.filter(isRoleOption):[]}
+function roleOptions(value:unknown):RoleOption[]{return Array.isArray(value)?value.filter(isRoleOption).filter(role=>!isAdminHeadRole(role)):[]}
 export default function EmployeeCreateDialog({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void}){
  const [states,setStates]=useState<Option[]>([]),[districts,setDistricts]=useState<Option[]>([]),[branches,setBranches]=useState<Option[]>([]),[roles,setRoles]=useState<RoleOption[]>([]);const [state,setState]=useState(''),[district,setDistrict]=useState(''),[error,setError]=useState(''),[roleError,setRoleError]=useState(''),[rolesLoading,setRolesLoading]=useState(true),[busy,setBusy]=useState(false);
  async function loadRoles(){setRolesLoading(true);setRoleError('');try{const result=await api.get<unknown>('/employees/creatable-roles');const availableRoles=roleOptions(result.data);setRoles(availableRoles);if(!availableRoles.length)setRoleError('No employee roles are configured for your account.')}catch(e){setRoleError(e instanceof Error?e.message:'Could not load employee roles')}finally{setRolesLoading(false)}}
