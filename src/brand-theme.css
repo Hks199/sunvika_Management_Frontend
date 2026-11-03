@@ -1,0 +1,235 @@
+:root {
+  color: #17204f;
+  background: #f6f7fc;
+  --ink: #17204f;
+  --muted: #78819b;
+  --green: #1b2b91;
+  --line: #e5e8f2;
+  --surface: #fff;
+  --brand-navy: #17247a;
+  --brand-navy-deep: #10184f;
+  --brand-orange: #ef7418;
+  --brand-orange-soft: #fff2e8;
+}
+
+.login-page,
+.app-shell {
+  background: #f6f7fc;
+}
+
+.login-story {
+  background:
+    radial-gradient(ellipse at 82% 18%, rgb(239 116 24 / 22%), transparent 34%),
+    linear-gradient(145deg, #17247a 0%, #131d62 52%, #10184f 100%);
+}
+
+.login-story:before,
+.login-story:after {
+  border-color: rgb(255 255 255 / 10%);
+}
+
+.login-story > .brand {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgb(6 13 54 / 16%);
+}
+
+.login-story > .brand .brand-logo {
+  display: block;
+  width: min(250px, 100%);
+  height: auto;
+}
+
+.brand-mark {
+  background: #fff0e4;
+  color: #b94a00;
+}
+
+.eyebrow.light {
+  color: #ffb36f;
+}
+
+.story-copy h1 em {
+  color: #ff9a43;
+}
+
+.story-copy p {
+  color: #e0e5ff;
+}
+
+.story-foot {
+  color: #bac3ee;
+}
+
+.login-wrap > .eyebrow,
+.page-heading .eyebrow,
+.welcome-copy .eyebrow {
+  color: var(--brand-navy);
+}
+
+.input-icon:focus-within,
+.search-field:focus-within {
+  border-color: #6678d8;
+  box-shadow: 0 0 0 3px rgb(102 120 216 / 14%);
+}
+
+.primary-btn {
+  background: linear-gradient(110deg, #17247a, #263aa3);
+  box-shadow: 0 5px 14px rgb(23 36 122 / 20%);
+}
+
+.primary-btn:hover {
+  background: linear-gradient(110deg, #10184f, #1d2c85);
+}
+
+.primary-btn:focus-visible,
+.secondary-btn:focus-visible,
+.filter-btn:focus-visible,
+.nav-link:focus-visible,
+.auth-link:focus-visible {
+  outline: 3px solid rgb(239 116 24 / 55%);
+  outline-offset: 2px;
+}
+
+.workspace-symbol {
+  background: #fff2e8;
+  color: #c65a0a;
+}
+
+.nav-link {
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover {
+  background: #f5f6fc;
+  color: var(--brand-navy);
+}
+
+.nav-link.active {
+  position: relative;
+  background: #eef0ff;
+  color: var(--brand-navy);
+  font-weight: 700;
+}
+
+.nav-link.active:before {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--brand-orange);
+  content: "";
+}
+
+.nav-link.active svg {
+  color: var(--brand-navy);
+}
+
+.avatar,
+.top-avatar {
+  background: #eef0ff;
+  color: var(--brand-navy);
+}
+
+.status-dot {
+  background: #24936a;
+  box-shadow: 0 0 0 3px #e8f5ee;
+}
+
+.secondary-btn:hover,
+.filter-btn:hover {
+  border-color: #ccd2ef;
+  color: var(--brand-navy);
+  background: #f9f9ff;
+}
+
+.metric-icon,
+.focus-icon,
+.quick-icon.mint {
+  background: #eef0ff;
+  color: var(--brand-navy);
+}
+
+.wave {
+  color: #263aa3;
+}
+
+.welcome-sun span {
+  background: #6979d3;
+}
+
+.floating-card {
+  color: var(--brand-navy);
+}
+
+.report-empty > span,
+.table-state .empty-icon {
+  background: #eef0ff;
+  color: #5365c4;
+}
+
+.report-picker select {
+  color: #394e58;
+}
+
+.tone-2 .metric-icon,
+.focus-bullet.amber {
+  background: var(--brand-orange-soft);
+  color: #c65a0a;
+}
+
+.metric-trend,
+.live-pill,
+.status-pill.status-good {
+  color: #18764f;
+  background: #edf7f1;
+}
+
+.metric-card,
+.panel,
+.quick-card {
+  border-color: #e7e9f2;
+  box-shadow: 0 4px 16px rgb(26 34 85 / 4%);
+}
+
+.text-link,
+.auth-link {
+  color: var(--brand-navy);
+}
+
+.text-link:hover,
+.auth-link:hover {
+  color: #c65a0a;
+}
+
+.legend-leads,
+.branch-performance-track i {
+  background: var(--brand-navy);
+}
+
+.focus-list a:hover,
+.profile-menu button:hover {
+  background: #f5f6fc;
+}
+
+.profile-menu button:hover {
+  color: var(--brand-navy);
+}
+
+.permission-chip,
+.session-device {
+  background: #eef0ff;
+  color: var(--brand-navy);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-link {
+    transition: none;
+  }
+}
