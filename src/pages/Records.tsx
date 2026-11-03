@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, ChevronLeft, ChevronRight, CircleAlert, Plus, RefreshCw, Search, SlidersHorizontal } from 'lucide-react';
 import { api } from '../lib/api';
+import { displayValue } from '../lib/display';
 import CreateDialog from '../components/CreateDialog';
 import RecordDetails from '../components/RecordDetails';
 import EmployeeCreateDialog from '../components/EmployeeCreateDialog';
@@ -17,10 +18,10 @@ const configs:Record<string,Config>={
  employees:{title:'Employees',eyebrow:'YOUR ORGANIZATION',description:'Manage accessible team members and reporting relationships.',endpoint:'/employees',columns:['employeeCode','firstName','lastName','email','role','isActive'],createPath:'/employees'},
  geography:{title:'Geography',eyebrow:'ORGANIZATION SETUP',description:'Browse active states, districts, and branches available to your team.',endpoint:'/geography/states',columns:['name','code','status','createdAt']},
  roles:{title:'Roles & permissions',eyebrow:'ACCESS CONTROL',description:'Review configured roles and capabilities. Changes are restricted to the Managing Director.',endpoint:'/roles',columns:['name','code','category','parentRole','isActive']},
- audit:{title:'Audit log',eyebrow:'SECURITY & COMPLIANCE',description:'Review recorded management actions available to your account.',endpoint:'/audit-logs',columns:['action','actor','resource','resourceId','createdAt']},
+ audit:{title:'Audit log',eyebrow:'SECURITY & COMPLIANCE',description:'Review recorded management actions available to your account.',endpoint:'/audit-logs',columns:['action','actor','resource','createdAt']},
 };
 function unwrap(data:unknown):{rows:Row[];total:number}{if(Array.isArray(data))return {rows:data as Row[],total:data.length};if(data&&typeof data==='object'){const d=data as Record<string,unknown>;const arr=(d.items??d.results??d.rows??d.data??d.records??d.employees);if(Array.isArray(arr)){const meta=(d.meta&&typeof d.meta==='object'?d.meta:{}) as Record<string,unknown>;return {rows:arr as Row[],total:Number(meta.total??d.total??arr.length)}}}return {rows:[],total:0}}
-function display(value:unknown):string {if(value==null||value==='')return '—';if(typeof value==='string'&&/^\d{4}-\d\d-\d\d/.test(value)){const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}if(typeof value==='object'){const v=value as Row;return String(v.name??v.customerName??v.firstName??v.employeeCode??v.leadCode??v.label??v.code??v._id??'—')}return String(value)}
+function display(value:unknown):string {if(typeof value==='string'&&/^\d{4}-\d\d-\d\d/.test(value)){const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}return displayValue(value)}
 function titleCase(value:string){return value.replace(/([A-Z])/g,' $1').replace(/^./,s=>s.toUpperCase())}
 function geographyOptions(value:unknown):GeographyOption[]{if(Array.isArray(value))return value as GeographyOption[];if(value&&typeof value==='object'&&'data'in value&&Array.isArray((value as {data:unknown}).data))return (value as {data:GeographyOption[]}).data;return []}
 export default function Records({type}:{type:string}){

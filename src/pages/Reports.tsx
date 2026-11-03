@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { BarChart3, Copy, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
+import { displayJson } from '../lib/display';
 
 const reports = [
   ['employee-performance', 'Employee performance'],
@@ -13,12 +14,28 @@ const reports = [
   ['quotations', 'Quotation report'],
 ];
 type GeographyOption = { _id: string; name: string };
+type EmployeeOption = { _id: string; firstName?: string; lastName?: string; employeeCode?: string; role?: { name?: string; code?: string } | string };
 function geographyOptions(value: unknown): GeographyOption[] {
   if (Array.isArray(value)) return value as GeographyOption[];
   if (value && typeof value === 'object' && 'data' in value && Array.isArray((value as { data: unknown }).data)) {
     return (value as { data: GeographyOption[] }).data;
   }
   return [];
+}
+function employeeOptions(value: unknown): EmployeeOption[] {
+  if (Array.isArray(value)) return value as EmployeeOption[];
+  if (value && typeof value === 'object' && 'data' in value && Array.isArray((value as { data: unknown }).data)) {
+    return (value as { data: EmployeeOption[] }).data;
+  }
+  return [];
+}
+function employeeName(employee: EmployeeOption): string {
+  const name = [employee.firstName, employee.lastName].filter(Boolean).join(' ');
+  const role = typeof employee.role === 'string' ? employee.role : employee.role?.name ?? employee.role?.code;
+  return [name || employee.employeeCode || 'Employee', role, employee.employeeCode && name ? employee.employeeCode : ''].filter(Boolean).join(' · ');
+}
+function employeeRoleCode(employee: EmployeeOption): string {
+  return typeof employee.role === 'string' ? employee.role : employee.role?.code ?? '';
 }
 
 export default function Reports() {
@@ -30,6 +47,9 @@ export default function Reports() {
   const [states, setStates] = useState<GeographyOption[]>([]);
   const [districts, setDistricts] = useState<GeographyOption[]>([]);
   const [branches, setBranches] = useState<GeographyOption[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const expectedEmployeeRole = ({ cpId: 'CP', rmId: 'RM', dcId: 'DC', mhId: 'MH' } as const)[employeeScope as 'cpId' | 'rmId' | 'dcId' | 'mhId'];
+  const scopedEmployees = employees.filter((employee) => employeeRoleCode(employee) === expectedEmployeeRole);
   const [stateId, setStateId] = useState('');
   const [districtId, setDistrictId] = useState('');
   const [branchId, setBranchId] = useState('');
@@ -40,6 +60,14 @@ export default function Reports() {
     void api.get<unknown>('/geography/states')
       .then((response) => { if (active) setStates(geographyOptions(response.data)); })
       .catch((cause) => { if (active) setGeographyError(cause instanceof Error ? cause.message : 'Could not load states'); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void api.get<unknown>('/employees?page=1&limit=100')
+      .then((response) => { if (active) setEmployees(employeeOptions(response.data)); })
+      .catch((cause) => { if (active) setGeographyError(cause instanceof Error ? cause.message : 'Could not load employees'); });
     return () => { active = false; };
   }, []);
 
@@ -90,7 +118,7 @@ export default function Reports() {
   async function copyResult() {
     if (!result) return;
     try {
-      await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+      await navigator.clipboard.writeText(displayJson(result));
     } catch (cause) {
       setError(cause instanceof Error ? `Could not copy report: ${cause.message}` : 'Could not copy report');
     }
@@ -112,7 +140,7 @@ export default function Reports() {
         <label className="field-label">Branch<select name="branchId" value={branchId} onChange={(event) => setBranchId(event.target.value)} disabled={!districtId}><option value="">All branches</option>{branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select></label>
         {geographyError && <div className="notice-error" role="alert">{geographyError}</div>}
         <label className="field-label">Employee scope type<select value={employeeScope} onChange={(event) => setEmployeeScope(event.target.value)}><option value="cpId">Channel Partner</option><option value="rmId">Relationship Manager</option><option value="dcId">District Coordinator</option><option value="mhId">Marketing Head</option></select></label>
-        <label className="field-label">Employee ID<input name={employeeScope} placeholder="Optional 24-character ID" maxLength={24}/></label>
+        <label className="field-label">Employee<select name={employeeScope} defaultValue=""><option value="">All employees</option>{scopedEmployees.map((employee) => <option key={employee._id} value={employee._id}>{employeeName(employee)}</option>)}</select></label>
         <label className="field-label">Lead status<select name="leadStatus" defaultValue=""><option value="">All statuses</option>{['PENDING', 'INTERESTED', 'NOT_INTERESTED', 'SITE_VISITED', 'NEED_FOLLOWUP', 'LOST', 'QUOTATION_SENT', 'CONVERTED'].map((status) => <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>)}</select></label>
         <label className="field-label">Customer status<select name="customerStatus" defaultValue=""><option value="">All statuses</option>{['ONBOARDING', 'ACTIVE', 'COMPLETED', 'CANCELLED'].map((status) => <option key={status} value={status}>{status}</option>)}</select></label>
         <button className="primary-btn report-run" disabled={busy}>{busy ? <RefreshCw className="spin" size={16}/> : <BarChart3 size={16}/>}Generate report</button>
@@ -120,7 +148,7 @@ export default function Reports() {
       <section className="panel report-result">
         <div className="panel-heading"><div><h2>{reports.find(([value]) => value === kind)?.[1]}</h2><p>Live data returned by the management API</p></div><button className="filter-btn" onClick={() => void copyResult()} disabled={!result}><Copy size={15}/>Copy data</button></div>
         {error && <div className="notice-error" role="alert">{error}</div>}
-        {result ? <pre className="json-result">{JSON.stringify(result, null, 2)}</pre> : <div className="report-empty"><span><BarChart3 size={22}/></span><b>Your report will appear here</b><small>Choose a report and optional filters, then generate it.</small></div>}
+        {result ? <pre className="json-result">{displayJson(result)}</pre> : <div className="report-empty"><span><BarChart3 size={22}/></span><b>Your report will appear here</b><small>Choose a report and optional filters, then generate it.</small></div>}
       </section>
     </div>
   </div>;

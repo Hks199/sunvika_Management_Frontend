@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Download, ExternalLink, RefreshCw, Share2, X } from 'lucide-react';
 import { api } from '../lib/api';
+import { displayJson, displayValue } from '../lib/display';
 
 const endpoints: Record<string, string> = {
   leads: '/leads',
@@ -51,30 +52,11 @@ function label(value: string) {
 }
 
 function display(value: unknown): string {
-  if (value == null || value === '') return '—';
-  if (typeof value === 'string') {
-    if (/^\d{4}-\d\d-\d\dT/.test(value)) {
-      const date = new Date(value);
-      if (!Number.isNaN(date.getTime())) return date.toLocaleString();
-    }
-    return value;
+  if (typeof value === 'string' && /^\d{4}-\d\d-\d\dT/.test(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date.toLocaleString();
   }
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (typeof value === 'object' && '$numberDecimal' in value) {
-    const decimal = (value as RecordValue).$numberDecimal;
-    return typeof decimal === 'string' || typeof decimal === 'number' ? decimal.toLocaleString('en-IN') : '—';
-  }
-  if (Array.isArray(value)) {
-    return value.length && value.some((item) => item && typeof item === 'object')
-      ? JSON.stringify(value, null, 2)
-      : value.map(display).join(', ') || '—';
-  }
-  if (typeof value === 'object') {
-    const record = value as RecordValue;
-    const summary = record.name ?? record.customerName ?? record.firstName ?? record.employeeCode ?? record.leadCode ?? record.code ?? record._id;
-    return summary == null ? JSON.stringify(value, null, 2) : String(summary);
-  }
-  return '—';
+  return displayValue(value);
 }
 
 function referencedId(value: unknown): string {
@@ -173,7 +155,7 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
   }, [id, record, type]);
 
   const fields = record ? Object.entries(record).filter(([key]) => (
-    !/password|token|secret|s3key|uploadId|^key$|^__v$/i.test(key) &&
+    !/password|token|secret|s3key|uploadId|^key$|^__v$|^_id$|^id$/i.test(key) &&
     key !== 'profileImage' &&
     !(type === 'quotations' && ['version', 'totalProjectAmount'].includes(key))
   )) : [];
@@ -771,7 +753,7 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
                 <p className="form-hint">No status changes have been recorded for this lead yet.</p>
               )
             )}
-            {relatedRecord && !quotationFile && !isQuotationShareHistory && !isLeadStatusHistory && <pre className="json-result">{JSON.stringify(related, null, 2)}</pre>}
+            {relatedRecord && !quotationFile && !isQuotationShareHistory && !isLeadStatusHistory && <pre className="json-result">{displayJson(related)}</pre>}
             {quotationFile && (
               <div className="related-toolbar">
                 <button className="primary-btn" onClick={() => void shareQuotationFile(quotationFile)}><Share2 size={14}/> Share PDF</button>
