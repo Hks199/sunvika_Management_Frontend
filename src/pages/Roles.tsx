@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Pencil, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
 import { api } from '../lib/api';
-import { isAdminHeadRole, isAdminHeadRoleCode } from '../lib/roles';
+import { isRetiredRole, isAdminHeadRole, isAdminHeadRoleCode } from '../lib/roles';
 
 type Row = Record<string, unknown> & { _id: string; name: string };
 function list(data: unknown): Row[] { return Array.isArray(data) ? data as Row[] : []; }
@@ -10,7 +10,7 @@ function joined(value: unknown, excludeAdminHead = false): string {
     ? value.filter((item) => {
       if (!excludeAdminHead) return true;
       const code = typeof item === 'object' && item && 'code' in item ? (item as Record<string, unknown>).code : item;
-      return !isAdminHeadRoleCode(code);
+      return !isAdminHeadRoleCode(code) && String(code).trim().toUpperCase() !== "MH";
     }).map((item) => typeof item === 'object' && item && 'code' in item ? String((item as Record<string, unknown>).code) : String(item)).join(', ')
     : '';
 }
@@ -31,7 +31,7 @@ export default function Roles() {
         api.get<unknown>('/roles'),
         api.get<unknown>('/roles/permissions'),
       ]);
-      setRoles(list(roleResult.data).filter((role) => !isAdminHeadRole(role)));
+      setRoles(list(roleResult.data).filter((role) => !isAdminHeadRole(role) && !isRetiredRole(role)));
       setPermissions(list(permissionResult.data));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load roles and permissions'); }
   }, []);

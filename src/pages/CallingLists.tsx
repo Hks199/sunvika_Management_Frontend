@@ -1,0 +1,103 @@
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Download, Eye, FileSpreadsheet, RefreshCw, Upload, X } from 'lucide-react';
+import { api } from '../lib/api';
+import { useAuth } from '../state/auth';
+import { EXCEL_TYPE, MAX_EXCEL_SIZE, candidateDraft, cpPayload, personName, type CallingList, type CallingPreview, type Candidate, type CpDraft, type Person } from '../lib/calling-lists';
+
+type Place = { _id: string; name: string };
+const message = (error: unknown) => error instanceof Error ? error.message : 'The request failed. Please retry.';
+
+function CpForm({ listId, candidate, headers, manager, onClose, onSaved }: { listId: string; candidate: Candidate; headers: string[]; manager: string; onClose: () => void; onSaved: (sent: boolean) => void }) {
+  const [draft, setDraft] = useState<CpDraft>(() => candidateDraft(headers, candidate.values));
+  const [states, setStates] = useState<Place[]>([]), [districts, setDistricts] = useState<Place[]>([]);
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false), [reload, setReload] = useState(0);
+  useEffect(() => { let active = true; void api.get<Place[]>('/geography/states').then(r => { if (active) setStates(r.data); }).catch(e => { if (active) setError(message(e)); }); return () => { active = false; }; }, [reload]);
+  useEffect(() => { let active = true; setDistricts([]); if (draft.state) void api.get<Place[]>(`/geography/states/${encodeURIComponent(draft.state)}/districts`).then(r => { if (active) setDistricts(r.data); }).catch(e => { if (active) setError(message(e)); }); return () => { active = false; }; }, [draft.state, reload]);
+  function update(key: keyof CpDraft, value: string) { setDraft(previous => ({ ...previous, [key]: value, ...(key === 'state' ? { district: '' } : {}) })); }
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setBusy(true); setError('');
+    try { const result = await api.post<{ invitationSent: boolean }>(`/calling-lists/${listId}/candidates/${candidate._id}/create-cp`, cpPayload(draft)); onSaved(result.data.invitationSent); }
+    catch (e) { setError(message(e)); } finally { setBusy(false); }
+  }
+  return <div className="modal-backdrop"><form className="create-modal" onSubmit={event => void submit(event)} aria-label="Create channel partner">
+    <div className="modal-heading"><div><div className="eyebrow">CANDIDATE ROW {candidate.rowNumber}</div><h2>Create CP account</h2></div><button type="button" className="icon-button" aria-label="Close CP form" disabled={busy} onClick={onClose}><X size={20}/></button></div>
+    <p>Review the candidate details. This CP will report to {manager}. An invitation will be sent to their email.</p>
+    <fieldset disabled={busy} className="calling-fieldset"><div className="modal-fields">
+      {([['firstName', 'First name'], ['lastName', 'Last name'], ['email', 'Email'], ['mobileNumber', 'Mobile number'], ['addressLine', 'Address'], ['city', 'City'], ['pincode', 'Postal code']] as const).map(([key, label]) => <label key={key}>{label}<input type={key === 'email' ? 'email' : key === 'mobileNumber' ? 'tel' : 'text'} required={!['city', 'pincode'].includes(key)} maxLength={key === 'addressLine' ? 300 : key === 'email' ? 254 : key === 'mobileNumber' ? 16 : key === 'pincode' ? 12 : 80} value={draft[key]} onChange={e => update(key, e.target.value)}/></label>)}
+      <label>State<select required value={draft.state} onChange={e => update('state', e.target.value)}><option value="">Choose state</option>{states.map(state => <option value={state._id} key={state._id}>{state.name}</option>)}</select></label>
+      <label>District<select required disabled={!draft.state} value={draft.district} onChange={e => update('district', e.target.value)}><option value="">Choose district</option>{districts.map(district => <option value={district._id} key={district._id}>{district.name}</option>)}</select></label>
+    </div></fieldset>
+    {error && <div className="form-error" role="alert">{error} <button type="button" className="filter-btn" onClick={() => setReload(value => value + 1)}>Reload locations</button></div>}
+    <div className="modal-actions"><button type="button" className="secondary-btn" onClick={onClose} disabled={busy}>Cancel</button><button className="primary-btn" disabled={busy}>{busy ? 'Creating…' : 'Create CP & send invitation'}</button></div>
+  </form></div>;
+}
+
+export default function CallingLists() {
+  const { user } = useAuth();
+  const role = typeof user?.role === 'string' ? user.role : user?.role?.code;
+  const canManage = role === 'MD' || role === 'MIS', allowed = canManage || role === 'RM';
+  const [lists, setLists] = useState<CallingList[]>([]), [managers, setManagers] = useState<Person[]>([]);
+  const [page, setPage] = useState(1), [total, setTotal] = useState(0), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
+  const [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [title, setTitle] = useState(''), [file, setFile] = useState<File | null>(null), [assignedTo, setAssignedTo] = useState('');
+  const [selected, setSelected] = useState<CallingList | null>(null), [preview, setPreview] = useState<CallingPreview | null>(null), [previewPage, setPreviewPage] = useState(1);
+  const [previewLoading, setPreviewLoading] = useState(false), [previewReload, setPreviewReload] = useState(0), [candidate, setCandidate] = useState<Candidate | null>(null);
+  const input = useRef<HTMLInputElement>(null), previewRequest = useRef(0);
+  const load = useCallback(async () => {
+    if (!allowed) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const [result, rms] = await Promise.all([api.get<{ data: CallingList[]; total: number }>(`/calling-lists?page=${page}&limit=20`), canManage ? api.get<Person[]>('/calling-lists/managers') : Promise.resolve(null)]);
+      setLists(result.data.data); setTotal(result.data.total); if (rms) setManagers(rms.data);
+    } catch (e) { setError(message(e)); } finally { setLoading(false); }
+  }, [allowed, canManage, page]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const request = ++previewRequest.current; setPreview(null);
+    if (!selected) return;
+    setPreviewLoading(true);
+    void api.get<CallingPreview>(`/calling-lists/${selected._id}/preview?page=${previewPage}&limit=25`).then(r => { if (request === previewRequest.current) setPreview(r.data); }).catch(e => { if (request === previewRequest.current) setError(message(e)); }).finally(() => { if (request === previewRequest.current) setPreviewLoading(false); });
+    return () => { previewRequest.current++; };
+  }, [selected, previewPage, previewReload]);
+  async function downloadTemplate() {
+    setBusy(true); setError('');
+    try {
+      const result = await api.get<{ fileName: string; base64: string }>('/calling-lists/template');
+      const bytes = Uint8Array.from(atob(result.data.base64), character => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: EXCEL_TYPE }));
+      const link = document.createElement('a');
+      link.href = url; link.download = result.data.fileName;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { setError(message(e)); } finally { setBusy(false); }
+  }
+  async function upload(event: FormEvent) {
+    event.preventDefault(); setError(''); setNotice('');
+    if (!file || !/\.xlsx$/i.test(file.name) || file.size < 22 || file.size > MAX_EXCEL_SIZE) { setError('Choose an .xlsx workbook up to 5 MB.'); return; }
+    setBusy(true);
+    try {
+      const reservation = await api.post<{ _id: string }>('/calling-lists', { title: title.trim(), fileName: file.name, size: file.size, ...(assignedTo ? { assignedTo } : {}) });
+      await api.put(`/calling-lists/${reservation.data._id}/file`, file, EXCEL_TYPE);
+      setTitle(''); setFile(null); setAssignedTo(''); if (input.current) input.current.value = '';
+      setNotice('Excel calling list uploaded successfully.'); await load();
+    } catch (e) { setError(message(e)); } finally { setBusy(false); }
+  }
+  async function assign(list: CallingList, rmId: string) {
+    setBusy(true); setError(''); setNotice('');
+    try { await api.patch(`/calling-lists/${list._id}/assignment`, { assignedTo: rmId || null }); setSelected(null); setCandidate(null); setNotice(rmId ? 'Calling list assigned to the selected RM.' : 'Assignment removed.'); await load(); }
+    catch (e) { setError(message(e)); } finally { setBusy(false); }
+  }
+  async function download(list: CallingList) {
+    setBusy(true); setError('');
+    try { const result = await api.get<{ url: string }>(`/calling-lists/${list._id}/download-url`); const link = document.createElement('a'); link.href = result.data.url; link.download = list.fileName; link.rel = 'noreferrer'; document.body.appendChild(link); link.click(); link.remove(); }
+    catch (e) { setError(message(e)); } finally { setBusy(false); }
+  }
+  if (!allowed) return <div className="panel calling-panel"><h1>CP calling lists</h1><p>Available to MD, MIS and assigned Relationship Managers.</p></div>;
+  return <div className="page-wrap calling-lists"><div className="page-heading"><div><div className="eyebrow">CHANNEL PARTNER DEVELOPMENT</div><h1>CP calling lists</h1><p>{canManage ? 'Upload candidate workbooks and assign them to an active RM.' : 'Preview your assigned candidates and create channel partner accounts.'}</p></div><button className="secondary-btn" disabled={loading || busy} onClick={() => { setError(''); void load(); }}><RefreshCw size={15}/> Refresh</button></div>
+    {error && <div className="form-error" role="alert">{error}</div>}{notice && <div className="success-note" role="status">{notice}</div>}
+    {canManage && <form className="panel calling-panel" onSubmit={event => void upload(event)}><h2><Upload size={18}/> Upload candidate list</h2><button type="button" className="secondary-btn" disabled={busy} onClick={() => void downloadTemplate()}><Download size={15}/> Download blank Excel template</button><p>Download the blank template, fill one candidate per row below the headers, save, and upload it here.</p><p>One .xlsx worksheet, up to 5 MB, 50 columns and 10,000 candidates. Put column headers in the first row. Suggested columns: First name, Last name, Email, Mobile number, Address, City, Pincode. Missing account details can be completed when creating a CP.</p><fieldset disabled={busy} className="calling-fieldset"><div className="modal-fields"><label>List title<input required maxLength={160} value={title} onChange={e => setTitle(e.target.value)} placeholder="November CP candidates"/></label><label>Assign to RM<select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}><option value="">Assign later</option>{managers.map(rm => <option value={rm._id} key={rm._id}>{personName(rm)} · {rm.employeeCode}</option>)}</select></label><label className="field-wide">Excel workbook<input ref={input} type="file" accept=".xlsx" required onChange={e => setFile(e.target.files?.[0] ?? null)}/></label></div><div className="modal-actions"><button className="primary-btn" disabled={!file || !title.trim()}>{busy ? 'Uploading…' : 'Upload Excel list'}</button></div></fieldset></form>}
+    <div className="panel calling-panel"><h2><FileSpreadsheet size={18}/> {canManage ? 'Calling lists' : 'My assigned lists'} <small>({total})</small></h2>{loading ? <p role="status">Loading calling lists…</p> : !lists.length ? <p>{canManage ? 'No lists uploaded yet.' : 'No calling lists are assigned to you yet.'}</p> : <div className="calling-table-scroll"><table className="calling-table"><thead><tr><th>List</th><th>Candidates</th><th>Uploaded by</th><th>Assigned RM</th><th>Actions</th></tr></thead><tbody>{lists.map(list => <tr key={list._id}><td><b>{list.title}</b><small>{list.fileName}</small></td><td>{list.rowCount}</td><td>{personName(list.uploadedBy)}</td><td>{canManage ? <select aria-label={`Assigned RM for ${list.title}`} value={list.assignedTo?._id ?? ''} disabled={busy} onChange={e => void assign(list, e.target.value)}><option value="">Unassigned</option>{list.assignedTo && !managers.some(rm => rm._id === list.assignedTo?._id) && <option value={list.assignedTo._id}>{personName(list.assignedTo)} (inactive)</option>}{managers.map(rm => <option value={rm._id} key={rm._id}>{personName(rm)}</option>)}</select> : personName(list.assignedTo)}</td><td><div className="operation-toolbar"><button className="filter-btn" disabled={busy} onClick={() => { setSelected(list); setPreviewPage(1); setPreviewReload(value => value + 1); setError(''); }}><Eye size={14}/> Preview</button><button className="filter-btn" disabled={busy} onClick={() => void download(list)}><Download size={14}/> Download</button></div></td></tr>)}</tbody></table></div>}<div className="calling-pagination"><button className="secondary-btn" disabled={page === 1 || loading} onClick={() => setPage(value => value - 1)}>Previous</button><span>Page {page}</span><button className="secondary-btn" disabled={page * 20 >= total || loading} onClick={() => setPage(value => value + 1)}>Next</button></div></div>
+    {selected && <section className="panel calling-panel" aria-label="Excel preview"><div className="panel-heading"><div><h2>{selected.title}</h2><p>All uploaded columns · {selected.rowCount} candidate rows</p></div><button className="icon-button" aria-label="Close preview" onClick={() => setSelected(null)}><X size={18}/></button></div>{previewLoading ? <p role="status">Loading preview…</p> : preview ? <><div className="calling-table-scroll"><table className="calling-table"><thead><tr><th>Row</th>{preview.headers.map((header, i) => <th key={i}>{header}</th>)}{(role === 'MD' || role === 'RM') && <th>CP account</th>}</tr></thead><tbody>{preview.rows.map(row => <tr key={row._id}><td>{row.rowNumber}</td>{row.values.map((value, i) => <td key={i}>{value || '—'}</td>)}{(role === 'MD' || role === 'RM') && <td>{row.employee ? <span className="permission-chip">CP created</span> : <button className="filter-btn" disabled={!selected.assignedTo || busy} onClick={() => setCandidate(row)}>Create CP</button>}</td>}</tr>)}</tbody></table></div>{!selected.assignedTo && role === 'MD' && <p>Assign this list to an RM before creating CP accounts.</p>}<div className="calling-pagination"><button className="secondary-btn" disabled={previewPage === 1} onClick={() => setPreviewPage(value => value - 1)}>Previous rows</button><span>{(previewPage - 1) * 25 + 1}–{Math.min(previewPage * 25, preview.total)} of {preview.total}</span><button className="secondary-btn" disabled={previewPage * 25 >= preview.total} onClick={() => setPreviewPage(value => value + 1)}>Next rows</button></div></> : <button className="secondary-btn" onClick={() => setPreviewReload(value => value + 1)}>Retry preview</button>}</section>}
+    {candidate && selected && preview && <CpForm key={candidate._id} listId={selected._id} candidate={candidate} headers={preview.headers} manager={personName(selected.assignedTo)} onClose={() => setCandidate(null)} onSaved={sent => { setCandidate(null); setPreviewReload(value => value + 1); setNotice(sent ? 'CP account created and invitation sent.' : 'CP account created. Invitation was not delivered; use Employees to resend it.'); }}/>}
+  </div>;
+}

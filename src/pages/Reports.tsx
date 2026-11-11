@@ -48,7 +48,7 @@ export default function Reports() {
   const [districts, setDistricts] = useState<GeographyOption[]>([]);
   const [branches, setBranches] = useState<GeographyOption[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  const expectedEmployeeRole = ({ cpId: 'CP', rmId: 'RM', dcId: 'DC', mhId: 'MH' } as const)[employeeScope as 'cpId' | 'rmId' | 'dcId' | 'mhId'];
+  const expectedEmployeeRole = ({ cpId: 'CP', rmId: 'RM', cpHeadId: 'CP_HEAD' } as const)[employeeScope as 'cpId' | 'rmId' | 'cpHeadId'];
   const scopedEmployees = employees.filter((employee) => employeeRoleCode(employee) === expectedEmployeeRole);
   const [stateId, setStateId] = useState('');
   const [districtId, setDistrictId] = useState('');
@@ -103,7 +103,7 @@ export default function Reports() {
     setResult(null);
     const form = new FormData(event.currentTarget);
     const query = new URLSearchParams();
-    for (const key of ['dateFrom', 'dateTo', 'branchId', 'stateId', 'districtId', 'mhId', 'dcId', 'rmId', 'cpId', 'leadStatus', 'customerStatus']) {
+    for (const key of ['dateFrom', 'dateTo', 'branchId', 'stateId', 'districtId', 'cpHeadId', 'rmId', 'cpId', 'leadStatus', 'customerStatus']) {
       const value = String(form.get(key) ?? '').trim();
       if (value) query.set(key, value);
     }
@@ -139,7 +139,7 @@ export default function Reports() {
         <label className="field-label">District<select name="districtId" value={districtId} onChange={(event) => { setDistrictId(event.target.value); setBranchId(''); }} disabled={!stateId}><option value="">All districts</option>{districts.map((district) => <option key={district._id} value={district._id}>{district.name}</option>)}</select></label>
         <label className="field-label">Branch<select name="branchId" value={branchId} onChange={(event) => setBranchId(event.target.value)} disabled={!districtId}><option value="">All branches</option>{branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select></label>
         {geographyError && <div className="notice-error" role="alert">{geographyError}</div>}
-        <label className="field-label">Employee scope type<select value={employeeScope} onChange={(event) => setEmployeeScope(event.target.value)}><option value="cpId">Channel Partner</option><option value="rmId">Relationship Manager</option><option value="dcId">District Coordinator</option><option value="mhId">Marketing Head</option></select></label>
+        <label className="field-label">Employee scope type<select value={employeeScope} onChange={(event) => setEmployeeScope(event.target.value)}><option value="cpId">Channel Partner</option><option value="rmId">Relationship Manager</option><option value="cpHeadId">CP Head</option></select></label>
         <label className="field-label">Employee<select name={employeeScope} defaultValue=""><option value="">All employees</option>{scopedEmployees.map((employee) => <option key={employee._id} value={employee._id}>{employeeName(employee)}</option>)}</select></label>
         <label className="field-label">Lead status<select name="leadStatus" defaultValue=""><option value="">All statuses</option>{['PENDING', 'INTERESTED', 'NOT_INTERESTED', 'SITE_VISITED', 'NEED_FOLLOWUP', 'LOST', 'QUOTATION_SENT', 'CONVERTED'].map((status) => <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>)}</select></label>
         <label className="field-label">Customer status<select name="customerStatus" defaultValue=""><option value="">All statuses</option>{['ONBOARDING', 'ACTIVE', 'COMPLETED', 'CANCELLED'].map((status) => <option key={status} value={status}>{status}</option>)}</select></label>

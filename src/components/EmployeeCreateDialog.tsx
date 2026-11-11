@@ -1,16 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../lib/api';
-import { isAdminHeadRole } from '../lib/roles';
+import { isRetiredRole, isAdminHeadRole } from '../lib/roles';
 type Option={_id:string;name:string};
 function options(value:unknown):Option[]{if(Array.isArray(value))return value as Option[];if(value&&typeof value==='object'&&'data'in value&&Array.isArray((value as {data:unknown}).data))return (value as {data:Option[]}).data;return []}
 type RoleOption=Option&{code:string};
 function isRoleOption(value:unknown):value is RoleOption{if(!value||typeof value!=='object')return false;return '_id'in value&&'name'in value&&'code'in value&&typeof value._id==='string'&&typeof value.name==='string'&&typeof value.code==='string'}
-function roleOptions(value:unknown):RoleOption[]{return Array.isArray(value)?value.filter(isRoleOption).filter(role=>!isAdminHeadRole(role)):[]}
-export default function EmployeeCreateDialog({onClose,onSaved}:{onClose:()=>void;onSaved:()=>void}){
+function roleOptions(value:unknown):RoleOption[]{return Array.isArray(value)?value.filter(isRoleOption).filter(role=>!isAdminHeadRole(role) && !isRetiredRole(role)):[]}
+export default function EmployeeCreateDialog({onClose,onSaved,directory='all'}:{onClose:()=>void;onSaved:()=>void;directory?:'all'|'staff'|'cp'}){
  const [states,setStates]=useState<Option[]>([]),[districts,setDistricts]=useState<Option[]>([]),[branches,setBranches]=useState<Option[]>([]),[roles,setRoles]=useState<RoleOption[]>([]);const [state,setState]=useState(''),[district,setDistrict]=useState(''),[error,setError]=useState(''),[roleError,setRoleError]=useState(''),[rolesLoading,setRolesLoading]=useState(true),[busy,setBusy]=useState(false);
- async function loadRoles(){setRolesLoading(true);setRoleError('');try{const result=await api.get<unknown>('/employees/creatable-roles');const availableRoles=roleOptions(result.data);setRoles(availableRoles);if(!availableRoles.length)setRoleError('No employee roles are configured for your account.')}catch(e){setRoleError(e instanceof Error?e.message:'Could not load employee roles')}finally{setRolesLoading(false)}}
- useEffect(()=>{void loadRoles()},[]);
+ async function loadRoles(){setRolesLoading(true);setRoleError('');try{const result=await api.get<unknown>('/employees/creatable-roles');const availableRoles=roleOptions(result.data).filter(role=>directory==='all'||(directory==='cp'?role.code==='CP':role.code!=='CP'));setRoles(availableRoles);if(!availableRoles.length)setRoleError('No employee roles are configured for your account.')}catch(e){setRoleError(e instanceof Error?e.message:'Could not load employee roles')}finally{setRolesLoading(false)}}
+ useEffect(()=>{void loadRoles()},[directory]);
  useEffect(()=>{void api.get<unknown>('/geography/states').then(r=>setStates(options(r.data))).catch(e=>setError(e instanceof Error?e.message:'Could not load states'))},[]);
  useEffect(()=>{let active=true;setDistrict('');setDistricts([]);setBranches([]);if(state)void api.get<unknown>(`/geography/states/${encodeURIComponent(state)}/districts`).then(r=>{if(active)setDistricts(options(r.data))}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Could not load districts')});return()=>{active=false}},[state]);
  useEffect(()=>{let active=true;setBranches([]);if(district)void api.get<unknown>(`/geography/districts/${encodeURIComponent(district)}/branches`).then(r=>{if(active)setBranches(options(r.data))}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Could not load branches')});return()=>{active=false}},[district]);

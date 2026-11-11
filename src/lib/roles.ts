@@ -9,3 +9,7 @@ export function isAdminHeadRole(role: { code?: unknown; name?: unknown }): boole
 export function isAdminHeadRoleCode(value: unknown): boolean {
   return normalizeRoleCode(value) === 'ADMIN_HEAD';
 }
+
+export function isRetiredRole(role: { code?: unknown; name?: unknown }): boolean {
+  return normalizeRoleCode(role.code) === "MH" || normalizeRoleCode(role.name) === "MARKETING_HEAD";
+}

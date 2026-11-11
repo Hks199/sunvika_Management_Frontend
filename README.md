@@ -74,3 +74,16 @@ Import the repository into Netlify and use these build settings (Netlify also re
 ## Backend areas
 
 The API includes auth, employees/hierarchy, roles/RBAC, geography, leads, visits, customers/documents, quotations/sharing, dashboard/reports, AMC, audit, and health/readiness. Detailed business rules and fields live in the backend `docs/` directory; consult the corresponding validation schema before adding mutation forms.
+
+
+## CP candidate calling lists
+
+MD and MIS can upload single-sheet `.xlsx` calling lists (up to 5 MB) and assign any active RM. MIS manages its own uploads; MD manages all. Only the assigned RM can view that list among RMs; CP Head, CP and Admin Head have no calling-list access. The panel includes all-column preview, original Excel download, reassignment and reviewed row-to-CP creation for the assigned RM or MD. New CP accounts report to the assigned RM. Backend S3 permissions for `calling-lists/*` are required; see `../sunvika_Management_Backend/docs/CALLING_LISTS.md`.
+
+MD/MIS can download a blank, header-only Excel template from the calling-list upload panel, fill candidate data from row 2 and upload the saved workbook.
+
+
+Customer details now offers Convert to CP for MD, CP Head and RM. The confirmation form reviews account details and the reporting RM before sending the existing password-setup invitation. Employee details includes Customer history for converted CP accounts; original customer/history records are retained. See `../sunvika_Management_Backend/docs/CUSTOMER_CP_CONVERSION.md`.
+
+
+Employees excludes CP accounts in both the all-records and downline views. Use Organization > Channel Partners to view all CP accounts permitted by your hierarchy, including inactive accounts in the all-records view. CP details retain the existing employee actions, invitations and linked customer history.

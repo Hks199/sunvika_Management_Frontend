@@ -1,6 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Download, ExternalLink, RefreshCw, Share2, X } from 'lucide-react';
 import { api } from '../lib/api';
+import { branchChoices, branchSelectionUpdate, employeeDistrictId, type BranchChoice } from '../lib/employee-branches';
+import { useAuth } from '../state/auth';
+import CustomerCpConversion from './CustomerCpConversion';
 import { displayJson, displayValue } from '../lib/display';
 
 const endpoints: Record<string, string> = {
@@ -22,7 +25,7 @@ const actionFields: Record<string, Field[]> = {
   'visit-edit': [{ name: 'visitDate', label: 'Visit date', type: 'datetime-local' }, { name: 'nextVisitDate', label: 'Next visit', type: 'datetime-local' }, { name: 'remark', label: 'Visit remarks' }],
   'customer-edit': [{ name: 'customerName', label: 'Customer name' }, { name: 'mobileNumber', label: 'Mobile number' }, { name: 'alternateNumber', label: 'Alternate number' }, { name: 'siteAddress', label: 'Site address' }, { name: 'blockOrTehsil', label: 'Block / tehsil' }, { name: 'requiredCapacityKW', label: 'Capacity (kW)', type: 'number' }, { name: 'ratePerKW', label: 'Rate per kW', type: 'number' }, { name: 'paymentMode', label: 'Payment mode' }, { name: 'panelBrand', label: 'Panel brand' }, { name: 'panelTechnology', label: 'Panel technology' }, { name: 'status', label: 'Status', type: 'select', options: ['ONBOARDING', 'ACTIVE', 'COMPLETED', 'CANCELLED'] }],
   'quotation-share': [{ name: 'mobileNumber', label: 'WhatsApp number for chat-link fallback', required: true }],
-  'employee-edit': [{ name: 'firstName', label: 'First name' }, { name: 'middleName', label: 'Middle name' }, { name: 'lastName', label: 'Last name' }, { name: 'mobileNumber', label: 'Mobile number' }, { name: 'branch', label: 'Branch ID' }],
+  'employee-edit': [{ name: 'firstName', label: 'First name' }, { name: 'middleName', label: 'Middle name' }, { name: 'lastName', label: 'Last name' }, { name: 'mobileNumber', label: 'Mobile number' }, { name: 'branch', label: 'Branch' }],
   'employee-manager': [{ name: 'reportingManagerId', label: 'Reporting manager employee ID', required: true }],
   'amc-renew': [{ name: 'startDate', label: 'Renewal start', type: 'date', required: true }, { name: 'expiryDate', label: 'Renewal expiry', type: 'date', required: true }, { name: 'amount', label: 'Contract amount', type: 'number', required: true }, { name: 'currency', label: 'Currency', required: true }, { name: 'assignedEmployeeId', label: 'Assigned employee ID' }],
   'amc-renewal-status': [{ name: 'renewalStatus', label: 'Renewal status', type: 'select', required: true, options: ['DECLINED', 'NOT_DUE'] }],
@@ -48,6 +51,8 @@ const actionLabels: Record<string, string> = {
 };
 
 function label(value: string) {
+  const referenceLabels: Record<string, string> = { reportingTo: 'Reporting manager', hierarchyPath: 'Reporting chain', sourceCustomer: 'Original customer' };
+  if (referenceLabels[value]) return referenceLabels[value];
   return value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/^./, (first) => first.toUpperCase());
 }
 
@@ -65,7 +70,12 @@ function referencedId(value: unknown): string {
   return '';
 }
 
-export default function RecordDetails({ type, id, onClose }: { type: string; id: string; onClose: () => void }) {
+export default function RecordDetails({ type, id, onClose, channelPartner = false }: { type: string; id: string; onClose: () => void; channelPartner?: boolean }) {
+  const { user } = useAuth();
+  const roleCode = typeof user?.role === 'string' ? user.role : user?.role?.code;
+  const [convertCp, setConvertCp] = useState(false);
+  const [customerHistory, setCustomerHistory] = useState(false);
+  const [conversionNotice, setConversionNotice] = useState('');
   const [record, setRecord] = useState<RecordValue | null>(null);
   const [customerContext, setCustomerContext] = useState<RecordValue | null>(null);
   const [error, setError] = useState('');
@@ -80,6 +90,29 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
   const [leadStatus, setLeadStatus] = useState('');
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageError, setProfileImageError] = useState('');
+
+  const role = record?.role;
+  const isChannelPartner = type === 'employees' && (channelPartner || role === 'CP' || (role && typeof role === 'object' && 'code' in role && role.code === 'CP'));
+  const employeeName = isChannelPartner ? 'Channel Partner' : 'Employee';
+  const actionTitle = (name: string) => name === 'employee-edit' && isChannelPartner ? 'Edit channel partner' : actionLabels[name];
+  const districtId = employeeDistrictId(record?.address), currentBranchId = referencedId(record?.branch);
+  const [editBranch, setEditBranch] = useState('');
+  const [branches, setBranches] = useState<BranchChoice[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(false), [branchError, setBranchError] = useState('');
+  const [branchReload, setBranchReload] = useState(0);
+  useEffect(() => {
+    if (action !== 'employee-edit') return;
+    let active = true;
+    setEditBranch(currentBranchId); setBranches(branchChoices([], record?.branch)); setBranchError('');
+    if (!districtId) { setBranchesLoading(false); return; }
+    setBranchesLoading(true);
+    void api.get<unknown>(`/geography/districts/${encodeURIComponent(districtId)}/branches`).then(result => {
+      if (active) setBranches(branchChoices(result.data, record?.branch));
+    }).catch(cause => { if (active) setBranchError(cause instanceof Error ? cause.message : 'Unable to load branches'); })
+      .finally(() => { if (active) setBranchesLoading(false); });
+    return () => { active = false; };
+  }, [action, districtId, currentBranchId, branchReload, record?.branch]);
+
 
   async function shareQuotationFile(file: File) {
     if (typeof navigator.share !== 'function' || !navigator.canShare?.({ files: [file] })) {
@@ -324,6 +357,11 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
       } else if (action === 'lead-edit' || action === 'visit-edit' || action === 'customer-edit' || action === 'employee-edit') {
         const paths: Record<string, string> = { 'lead-edit': '/leads', 'visit-edit': '/visits', 'customer-edit': '/customers', 'employee-edit': '/employees' };
         const body = { ...values } as Record<string, unknown>;
+        if (action === 'employee-edit') {
+          delete body.branch;
+          Object.assign(body, branchSelectionUpdate(record?.branch, editBranch, branches));
+          if (!Object.keys(body).length) throw new Error('Change a field before saving.');
+        }
         for (const key of ['requiredCapacityKW', 'ratePerKW']) if (body[key] !== undefined) body[key] = Number(body[key]);
         if (action === 'visit-edit') for (const key of ['visitDate', 'nextVisitDate']) if (typeof body[key] === 'string') body[key] = new Date(body[key] as string).toISOString();
         await api.patch(`${paths[action]}/${id}`, body);
@@ -452,7 +490,7 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
         <div className="modal-heading">
           <div>
             <div className="eyebrow">RECORD DETAILS</div>
-            <h2 id="record-details-title">{label(type)}</h2>
+            <h2 id="record-details-title">{type === 'employees' ? employeeName : label(type)}</h2>
           </div>
           <button className="icon-button" aria-label="Close record details" onClick={onClose}><X size={18}/></button>
         </div>
@@ -463,8 +501,8 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
         ) : fields.length ? (
           <>
             {type === 'employees' && record?.profileImage && typeof record.profileImage === 'object' && (
-              <section className="employee-profile-preview" aria-label="Employee profile image">
-                {profileImageUrl ? <img src={profileImageUrl} alt={`${String(record.firstName ?? 'Employee')} profile`} onError={() => { setProfileImageUrl(''); setProfileImageError('The image could not be loaded. Check profile-bucket read access.'); }} /> : <div className="employee-profile-placeholder">{profileImageError ? 'Image unavailable' : <RefreshCw className="spin" size={18}/>}</div>}
+              <section className="employee-profile-preview" aria-label={`${employeeName} profile image`}>
+                {profileImageUrl ? <img src={profileImageUrl} alt={`${String(record.firstName ?? employeeName)} profile`} onError={() => { setProfileImageUrl(''); setProfileImageError('The image could not be loaded. Check profile-bucket read access.'); }} /> : <div className="employee-profile-placeholder">{profileImageError ? 'Image unavailable' : <RefreshCw className="spin" size={18}/>}</div>}
                 <div><b>Profile image</b>{profileImageError && <small role="status">{profileImageError}</small>}</div>
                 <button className="filter-btn" onClick={() => void directAction('employee-image')}>Refresh image</button>
               </section>
@@ -472,7 +510,7 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
             <dl className="details-list">
               {fields.map(([key, value]) => (
                 <div className="details-item" key={key}>
-                  <dt>{label(key)}</dt>
+                  <dt>{isChannelPartner && key === 'employeeCode' ? 'CP code' : label(key)}</dt>
                   <dd>{display(value)}</dd>
                 </div>
               ))}
@@ -590,9 +628,13 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
         {error && !loading && <div className="form-error" role="alert">{error}</div>}
         {!loading && record && (
           <div className="record-operations">
+            {conversionNotice && <div className="success-note" role="status">{conversionNotice}</div>}
+            {type === 'customers' && ['MD','CP_HEAD','RM'].includes(roleCode ?? '') && <button className="primary-btn" disabled={Boolean(record?.cpEmployee)} onClick={() => setConvertCp(true)}>{record?.cpEmployee ? 'CP account created' : 'Convert to CP'}</button>}
+            {type === 'employees' && referencedId(record?.sourceCustomer) && <button className="secondary-btn" onClick={() => setCustomerHistory(true)}>Customer history</button>}
+            {type === 'customers' && ['quotations', 'amcContracts'].map(key => <section key={key}><h3>{key === 'quotations' ? 'Quotation history' : 'AMC history'}</h3>{customerContextRows(key).length ? customerContextRows(key).map((item, index) => <dl className="details-list" key={String(item._id ?? index)}>{Object.entries(item).filter(([field]) => field !== "_id").map(([field, value]) => <div className="details-item" key={field}><dt>{label(field)}</dt><dd>{display(value)}</dd></div>)}</dl>) : <p>No records yet.</p>}</section>)}
             {actionOptions[type]?.length ? (
               <div className="operation-toolbar">
-                {actionOptions[type].map((name) => <button className="filter-btn" key={name} onClick={() => { setRelated(null); setLeadStatus(''); setGenerateQuotation(false); setAction(action === name ? '' : name); }}>{actionLabels[name]}</button>)}
+                {actionOptions[type].map((name) => <button className="filter-btn" key={name} onClick={() => { setRelated(null); setLeadStatus(''); setGenerateQuotation(false); setAction(action === name ? '' : name); }}>{actionTitle(name)}</button>)}
                 {type === 'employees' && <><button className="filter-btn" onClick={() => void directAction('employee-activate')}>Activate</button><button className="filter-btn" onClick={() => void directAction('employee-deactivate')}>Deactivate</button><button className="filter-btn" onClick={() => void directAction('employee-invite')}>Resend invitation</button><button className="filter-btn" onClick={() => void directAction('employee-image')}>Profile image</button></>}
                 {type === 'quotations' && <button className="filter-btn" onClick={() => void directAction('quotation-download')}><Download size={14}/> Download PDF</button>}
                 {type === 'amc' && <button className="filter-btn danger-btn" onClick={() => void directAction('amc-cancel')}>Cancel contract</button>}
@@ -600,10 +642,11 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
             ) : null}
             {action && actionFields[action] && (
               <form className="operation-form" onSubmit={(event) => void submitAction(event)}>
-                <h3>{actionLabels[action]}</h3>
+                <h3>{actionTitle(action)}</h3>
                 <div className="modal-fields">
                   {action === 'lead-convert' && <p className="form-hint field-wide">Upload all four required documents to convert this lead. Accepted formats: PDF, JPEG, PNG, or WebP. The server verifies each file before conversion.</p>}
-                  {actionFields[action].filter((field) => field.name !== 'nextFollowUpDate' || (action === 'lead-status' && leadStatus === 'NEED_FOLLOWUP')).map((field) => <label key={field.name}>{field.label}{field.type === 'select' ? <select name={field.name} required={field.required} defaultValue="" onChange={field.name === 'status' && action === 'lead-status' ? (event) => { setLeadStatus(event.target.value); setGenerateQuotation(false); } : undefined}><option value="">Choose…</option>{field.options?.map((option) => <option key={option} value={option}>{label(option)}</option>)}</select> : <input name={field.name} type={field.type ?? 'text'} accept={field.type === 'file' ? 'application/pdf,image/jpeg,image/png,image/webp' : undefined} required={field.required || (action === 'lead-status' && field.name === 'nextFollowUpDate')} step={field.type === 'number' ? 'any' : undefined}/>}</label>)}
+                  {actionFields[action].filter((field) => field.name !== 'nextFollowUpDate' || (action === 'lead-status' && leadStatus === 'NEED_FOLLOWUP')).map((field) => <label key={field.name}>{field.label}{action === 'employee-edit' && field.name === 'branch' ? <select name="branch" value={editBranch} disabled={branchesLoading || actionBusy} onChange={event => setEditBranch(event.target.value)}><option value="">{branchesLoading ? 'Loading branches...' : 'No branch'}</option>{branches.map(branch => <option key={branch.value} value={branch.value}>{branch.label}</option>)}</select> : field.type === 'select' ? <select name={field.name} required={field.required} defaultValue="" onChange={field.name === 'status' && action === 'lead-status' ? (event) => { setLeadStatus(event.target.value); setGenerateQuotation(false); } : undefined}><option value="">Choose…</option>{field.options?.map((option) => <option key={option} value={option}>{label(option)}</option>)}</select> : <input name={field.name} type={field.type ?? 'text'} accept={field.type === 'file' ? 'application/pdf,image/jpeg,image/png,image/webp' : undefined} required={field.required || (action === 'lead-status' && field.name === 'nextFollowUpDate')} step={field.type === 'number' ? 'any' : undefined}/>}</label>)}
+                  {action === 'employee-edit' && <><p className="form-hint">Choose a branch in the current address district. The current branch stays selected unless you change it.</p>{branchError && <div className="form-error" role="alert">{branchError} <button type="button" className="filter-btn" onClick={() => setBranchReload(value => value + 1)}>Retry branches</button></div>}</>}
                   {action === 'quotation-share' && <p className="form-hint">The device share menu asks you to choose WhatsApp and the recipient. This number is only for the chat-link fallback; WhatsApp cannot pre-attach a PDF to a selected chat.</p>}
                   {action === 'lead-status' && leadStatus === 'QUOTATION_SENT' && (
                     <>
@@ -612,7 +655,7 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
                     </>
                   )}
                 </div>
-                <div className="modal-actions"><button type="button" className="secondary-btn" onClick={() => setAction('')}>Cancel</button><button className="primary-btn" disabled={actionBusy}>{actionBusy ? action === 'lead-convert' ? 'Uploading & converting…' : 'Saving…' : action === 'lead-convert' ? 'Upload documents & convert' : 'Save'}</button></div>
+                <div className="modal-actions"><button type="button" className="secondary-btn" onClick={() => setAction('')}>Cancel</button><button className="primary-btn" disabled={actionBusy || (action === 'employee-edit' && branchesLoading)}>{actionBusy ? action === 'lead-convert' ? 'Uploading & converting…' : 'Saving…' : action === 'lead-convert' ? 'Upload documents & convert' : 'Save'}</button></div>
               </form>
             )}
             {type === 'customers' && (
@@ -776,6 +819,8 @@ export default function RecordDetails({ type, id, onClose }: { type: string; id:
           <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
         </div>
       </section>
+      {convertCp && <CustomerCpConversion customerId={id} onClose={() => setConvertCp(false)} onSaved={(sent, already) => { setConvertCp(false); setConversionNotice(already ? 'This customer already has a CP account.' : sent ? 'CP account created. Password-setup invitation sent.' : 'CP account created. Invitation was not delivered; use Employees to resend it.'); void loadRecord().catch(e => setError(e instanceof Error ? e.message : 'Unable to refresh customer')); }}/> }
+      {customerHistory && referencedId(record?.sourceCustomer) && <RecordDetails type="customers" id={referencedId(record?.sourceCustomer)} onClose={() => setCustomerHistory(false)}/>}
     </div>
   );
 }

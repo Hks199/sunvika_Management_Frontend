@@ -8,7 +8,7 @@ function isRecord(value: unknown): value is DisplayRecord {
 }
 
 function personDisplay(value: DisplayRecord): string {
-  const name = [value.firstName, value.lastName]
+  const name = [value.firstName, value.middleName, value.lastName]
     .filter((part): part is string => typeof part === 'string' && Boolean(part.trim()))
     .join(' ');
   const employeeCode = typeof value.employeeCode === 'string' ? value.employeeCode : '';
