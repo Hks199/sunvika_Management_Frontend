@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Pencil, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../state/auth';
 import { api } from '../lib/api';
 import { isRetiredRole, isAdminHeadRole, isAdminHeadRoleCode } from '../lib/roles';
 
@@ -16,6 +17,8 @@ function joined(value: unknown, excludeAdminHead = false): string {
 }
 
 export default function Roles() {
+  const { user } = useAuth();
+  const canManage = (typeof user?.role === 'string' ? user.role : user?.role?.code) === 'MD';
   const [roles, setRoles] = useState<Row[]>([]);
   const [permissions, setPermissions] = useState<Row[]>([]);
   const [editing, setEditing] = useState<Row | null>(null);
@@ -25,6 +28,7 @@ export default function Roles() {
   const [notice, setNotice] = useState('');
 
   const load = useCallback(async () => {
+    if (!canManage) return;
     setError('');
     try {
       const [roleResult, permissionResult] = await Promise.all([
@@ -34,11 +38,12 @@ export default function Roles() {
       setRoles(list(roleResult.data).filter((role) => !isAdminHeadRole(role) && !isRetiredRole(role)));
       setPermissions(list(permissionResult.data));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load roles and permissions'); }
-  }, []);
+  }, [canManage]);
   useEffect(() => { void load(); }, [load]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canManage) return;
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     const csv = (name: string) => String(values[name] ?? '').split(',').map((item) => item.trim()).filter(Boolean);
     const isRole = form === 'role';
@@ -73,6 +78,8 @@ export default function Roles() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to save role configuration'); }
     finally { setBusy(false); }
   }
+
+  if (!canManage) return <div className="panel query-conversation"><h1>Roles &amp; permissions</h1><p>Only MD can manage roles and permissions.</p></div>;
 
   return <div className="page-wrap">
     <div className="page-heading"><div><div className="eyebrow">ACCESS CONTROL</div><h1>Roles & permissions</h1><p>Manage roles and permission codes. The API restricts these operations to the Managing Director.</p></div><div className="heading-actions"><button className="secondary-btn" onClick={() => { setEditing(null); setForm('permission'); }}><Plus size={15}/>Permission</button><button className="primary-btn" onClick={() => { setEditing(null); setForm('role'); }}><Plus size={15}/>Role</button></div></div>

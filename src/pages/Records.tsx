@@ -30,6 +30,7 @@ export default function Records({type}:{type:string}){
  const isEmployeeDirectory=type==='employees'||type==='channel-partners';
  const config=configs[type];const {user}=useAuth();const roleCode=typeof user?.role==='object'?user.role?.code:user?.role;const [rows,setRows]=useState<Row[]>([]);const [total,setTotal]=useState(0);const [page,setPage]=useState(1);const [search,setSearch]=useState('');const [mode,setMode]=useState('all');const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [creating,setCreating]=useState(false);const [selectedId,setSelectedId]=useState('');
  const [states,setStates]=useState<GeographyOption[]>([]);const [districts,setDistricts]=useState<GeographyOption[]>([]);const [branches,setBranches]=useState<GeographyOption[]>([]);const [stateId,setStateId]=useState('');const [districtId,setDistrictId]=useState('');const [branchId,setBranchId]=useState('');const [dateFrom,setDateFrom]=useState('');const [dateTo,setDateTo]=useState('');const [employeeName,setEmployeeName]=useState('');const [geographyError,setGeographyError]=useState('');
+ const organizationView=['MD','MIS'].includes(roleCode??'')&&['employees','channel-partners','leads','visits','customers','quotations','amc'].includes(type);
  const supportsFilters=isEmployeeDirectory||['leads','visits','quotations','customers'].includes(type);
  const [cpType,setCpType]=useState('');
  useEffect(()=>{requestId.current++;setMode('all');setPage(1);setSearch('');setSelectedId('');setCreating(false);setStateId('');setDistrictId('');setBranchId('');setDateFrom('');setDateTo('');setEmployeeName('');setCpType('')},[type]);
@@ -42,7 +43,7 @@ export default function Records({type}:{type:string}){
  return (
   <div className="page-wrap">
    <div className="page-heading">
-    <div><div className="eyebrow">{config.eyebrow}</div><h1>{config.title}</h1><p>{config.description}</p></div>
+    <div><div className="eyebrow">{config.eyebrow}</div><h1>{config.title}</h1><p>{organizationView?`View all ${config.title.toLowerCase()} across the organization.`:config.description}</p></div>
     <div className="heading-actions">
      {config.createPath&&(type!=='channel-partners'||roleCode==='RM')&&<button className="primary-btn" onClick={()=>setCreating(true)}><Plus size={16}/>New {type==='amc'?'contract':type==='leads'?'lead':type==='visits'?'visit':type==='channel-partners'?'CP':'employee'}</button>}
     </div>
@@ -51,7 +52,7 @@ export default function Records({type}:{type:string}){
     <div className="records-toolbar">
      {(type==='leads'||type==='customers')?<div className="search-field"><Search size={16}/><input aria-label={`Search ${config.title}`} placeholder={`Search ${config.title.toLowerCase()}…`} value={search} maxLength={100} onChange={e=>{setPage(1);setSearch(e.target.value)}}/><kbd>⌘ K</kbd></div>:<div/>}
      <div className="toolbar-actions">
-      {(type==='leads'||type==='visits'||type==='amc'||isEmployeeDirectory)&&<select aria-label="Record view" value={mode} onChange={e=>{setMode(e.target.value);setPage(1)}}><option value="all">All {config.title.toLowerCase()}</option>{type==='leads'&&<><option value="follow-ups">Upcoming follow-ups</option><option value="overdue">Overdue follow-ups</option></>}{type==='visits'&&<><option value="follow-ups">Upcoming follow-ups</option><option value="overdue">Overdue follow-ups</option></>}{type==='amc'&&<><option value="renewals">Upcoming renewals</option><option value="schedules">Upcoming service</option></>}{isEmployeeDirectory&&<option value="downline">My downline</option>}</select>}
+      {(type==='leads'||type==='visits'||type==='amc'||isEmployeeDirectory)&&<select aria-label="Record view" value={mode} onChange={e=>{setMode(e.target.value);setPage(1)}}><option value="all">All {config.title.toLowerCase()}</option>{type==='leads'&&<><option value="follow-ups">Upcoming follow-ups</option><option value="overdue">Overdue follow-ups</option></>}{type==='visits'&&<><option value="follow-ups">Upcoming follow-ups</option><option value="overdue">Overdue follow-ups</option></>}{type==='amc'&&<><option value="renewals">Upcoming renewals</option><option value="schedules">Upcoming service</option></>}{isEmployeeDirectory&&<option value="downline">{organizationView?'Organization team':'My downline'}</option>}</select>}
       <button className="filter-btn" onClick={()=>void load()}><SlidersHorizontal size={15}/> Refresh</button>
      </div>
     </div>
