@@ -73,6 +73,7 @@ function referencedId(value: unknown): string {
 export default function RecordDetails({ type, id, onClose, channelPartner = false }: { type: string; id: string; onClose: () => void; channelPartner?: boolean }) {
   const { user } = useAuth();
   const roleCode = typeof user?.role === 'string' ? user.role : user?.role?.code;
+  const canSendQuotation = Boolean(roleCode) && roleCode !== 'CP';
   const [convertCp, setConvertCp] = useState(false);
   const [customerHistory, setCustomerHistory] = useState(false);
   const [conversionNotice, setConversionNotice] = useState('');
@@ -115,6 +116,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
 
 
   async function shareQuotationFile(file: File) {
+    if (!canSendQuotation) return;
     if (typeof navigator.share !== 'function' || !navigator.canShare?.({ files: [file] })) {
       setRelatedError('This browser cannot share PDF files directly. Download the quotation, then attach it in WhatsApp.');
       return;
@@ -230,7 +232,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
     leads: ['lead-status', 'lead-assignment', 'lead-edit', 'lead-convert'],
     visits: ['visit-edit'],
     customers: ['customer-edit'],
-    quotations: ['quotation-share'],
+    quotations: canSendQuotation ? ['quotation-share'] : [],
     employees: ['employee-edit', 'employee-manager'],
     amc: ['amc-renew', 'amc-renewal-status', 'amc-schedule', 'amc-schedule-update', 'amc-service'],
   };
@@ -403,6 +405,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
         values.documentUploadIds = reservations.data.map(({ uploadId }) => uploadId);
         await api.post(`/customers/from-lead/${id}`, values);
       } else if (action === 'quotation-share') {
+        if (!canSendQuotation) throw new Error('Channel partners cannot send quotations.');
         const result = await api.post<{ whatsappUrl?: string; expiresAt?: string; deliveryStatus?: string }>(`/quotations/${id}/share`, values);
         if (!result.data?.whatsappUrl) throw new Error('The API did not return a WhatsApp share link.');
         const pdf = await api.getBlob(`/quotations/${id}/file`);
@@ -632,7 +635,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
             {type === 'customers' && ['MD','CP_HEAD','RM'].includes(roleCode ?? '') && <button className="primary-btn" disabled={Boolean(record?.cpEmployee)} onClick={() => setConvertCp(true)}>{record?.cpEmployee ? 'CP account created' : 'Convert to CP'}</button>}
             {type === 'employees' && referencedId(record?.sourceCustomer) && <button className="secondary-btn" onClick={() => setCustomerHistory(true)}>Customer history</button>}
             {type === 'customers' && ['quotations', 'amcContracts'].map(key => <section key={key}><h3>{key === 'quotations' ? 'Quotation history' : 'AMC history'}</h3>{customerContextRows(key).length ? customerContextRows(key).map((item, index) => <dl className="details-list" key={String(item._id ?? index)}>{Object.entries(item).filter(([field]) => field !== "_id").map(([field, value]) => <div className="details-item" key={field}><dt>{label(field)}</dt><dd>{display(value)}</dd></div>)}</dl>) : <p>No records yet.</p>}</section>)}
-            {actionOptions[type]?.length ? (
+            {actionOptions[type]?.length || type === 'quotations' ? (
               <div className="operation-toolbar">
                 {actionOptions[type].map((name) => <button className="filter-btn" key={name} onClick={() => { setRelated(null); setLeadStatus(''); setGenerateQuotation(false); setAction(action === name ? '' : name); }}>{actionTitle(name)}</button>)}
                 {type === 'employees' && <><button className="filter-btn" onClick={() => void directAction('employee-activate')}>Activate</button><button className="filter-btn" onClick={() => void directAction('employee-deactivate')}>Deactivate</button><button className="filter-btn" onClick={() => void directAction('employee-invite')}>Resend invitation</button><button className="filter-btn" onClick={() => void directAction('employee-image')}>Profile image</button></>}
@@ -640,7 +643,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
                 {type === 'amc' && <button className="filter-btn danger-btn" onClick={() => void directAction('amc-cancel')}>Cancel contract</button>}
               </div>
             ) : null}
-            {action && actionFields[action] && (
+            {action && actionFields[action] && (action !== 'quotation-share' || canSendQuotation) && (
               <form className="operation-form" onSubmit={(event) => void submitAction(event)}>
                 <h3>{actionTitle(action)}</h3>
                 <div className="modal-fields">
@@ -797,20 +800,20 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
               )
             )}
             {relatedRecord && !quotationFile && !isQuotationShareHistory && !isLeadStatusHistory && <pre className="json-result">{displayJson(related)}</pre>}
-            {quotationFile && (
+            {canSendQuotation && quotationFile && (
               <div className="related-toolbar">
                 <button className="primary-btn" onClick={() => void shareQuotationFile(quotationFile)}><Share2 size={14}/> Share PDF</button>
                 <button className="filter-btn" onClick={() => downloadQuotationFile(quotationFile)}><Download size={14}/> Download PDF</button>
                 {whatsappUrl && <a className="filter-btn" href={whatsappUrl} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Open WhatsApp chat</a>}
               </div>
             )}
-            {quotationFile && (
+            {canSendQuotation && quotationFile && (
               <p className="form-hint">Choose WhatsApp from the device share menu, then select the recipient. WhatsApp does not allow websites to attach a PDF to a preselected chat.</p>
             )}
             {related !== null && typeof related === 'object' && 'downloadUrl' in related && typeof (related as RecordValue).downloadUrl === 'string' && (
               <a className="primary-btn" href={String((related as RecordValue).downloadUrl)} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Open download</a>
             )}
-            {related !== null && typeof related === 'object' && !quotationFile && 'whatsappUrl' in related && typeof (related as RecordValue).whatsappUrl === 'string' && (
+            {canSendQuotation && related !== null && typeof related === 'object' && !quotationFile && 'whatsappUrl' in related && typeof (related as RecordValue).whatsappUrl === 'string' && (
               <a className="primary-btn" href={String((related as RecordValue).whatsappUrl)} target="_blank" rel="noreferrer"><ExternalLink size={14}/> Open WhatsApp</a>
             )}
           </div>
