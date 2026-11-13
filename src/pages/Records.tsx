@@ -74,7 +74,7 @@ export default function Records({type}:{type:string}){
     <div className="table-footer"><span>Showing <b>{start}–{end}</b> of <b>{total}</b></span><div className="pagination"><button className="page-button" disabled={page<=1||loading} onClick={()=>setPage(v=>Math.max(1,v-1))} aria-label="Previous page"><ChevronLeft size={16}/></button><span>Page <b>{page}</b></span><button className="page-button" disabled={page*20>=total||loading} onClick={()=>setPage(v=>v+1)} aria-label="Next page"><ChevronRight size={16}/></button></div></div>
    </section>
    {creating&&(isEmployeeDirectory?<EmployeeCreateDialog directory={type==='channel-partners'?'cp':'staff'} onClose={()=>setCreating(false)} onSaved={()=>void load()}/>:<CreateDialog kind={type} onClose={()=>setCreating(false)} onSaved={()=>void load()}/>)}
-   {selectedId&&<RecordDetails channelPartner={type==='channel-partners'} type={isEmployeeDirectory?'employees':type} id={selectedId} onClose={()=>setSelectedId('')}/>}
+   {selectedId&&<RecordDetails channelPartner={type==='channel-partners'} type={isEmployeeDirectory?'employees':type} id={selectedId} onSaved={()=>void load()} onClose={()=>setSelectedId('')}/>}
   </div>
  );
 }
