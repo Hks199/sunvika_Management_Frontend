@@ -6,7 +6,7 @@ export type QueryThread = { _id: string; title: string; createdBy: Person; assig
 export type QueryMessage = { _id: string; sender: Person; body: string; createdAt: string };
 export type PageMeta = { page: number; limit: number; total: number; totalPages: number };
 export type QueryDetail = { thread: QueryThread; messages: QueryMessage[]; meta: PageMeta };
-export type QueryNotification = { _id: string; thread: string; title: string; readAt: string | null; createdAt: string };
+export type QueryNotification = { _id: string; thread?: string; kind?: 'CP_REMINDER'; body?: string; title: string; readAt: string | null; createdAt: string };
 export type NotificationInbox = { items: QueryNotification[]; unreadCount: number; meta: PageMeta };
 export type QueryApi = { get: <T>(path: string) => Promise<{ data: T }>; post: <T>(path: string, data?: unknown) => Promise<{ data: T }> };
 export function personName(person: Person | null | undefined) {

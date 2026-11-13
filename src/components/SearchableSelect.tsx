@@ -1,12 +1,12 @@
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 type Option = { value:string; label:string };
-export default function SearchableSelect({label,value,options,placeholder='Search or choose...',disabled=false,onChange}:{label:string;value:string;options:Option[];placeholder?:string;disabled?:boolean;onChange:(value:string)=>void}) {
+export default function SearchableSelect({label,value,options,placeholder='Search or choose...',emptyLabel='All accessible RMs',disabled=false,onChange}:{label:string;value:string;options:Option[];placeholder?:string;emptyLabel?:string;disabled?:boolean;onChange:(value:string)=>void}) {
   const id=useId(),input=useRef<HTMLInputElement>(null);
   const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[active,setActive]=useState(0);
   const selected=options.find(option=>option.value===value);
   const matching=options.filter(option=>option.label.toLowerCase().includes(query.trim().toLowerCase()));
-  const shown=[{value:'',label:'All accessible RMs'},...matching];
+  const shown=[{value:'',label:emptyLabel},...matching];
   const focused=Math.min(active,shown.length-1);
   function show(){setQuery('');setActive(0);setOpen(true);}
   function choose(option:Option){onChange(option.value);setQuery('');setOpen(false);}

@@ -1,9 +1,9 @@
 export const EXCEL_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-export const MAX_EXCEL_SIZE = 5 * 1024 * 1024;
+export const MAX_EXCEL_SIZE = 100 * 1024 * 1024;
 export type Person = { _id: string; firstName?: string; lastName?: string; employeeCode?: string; isActive?: boolean };
-export type CallingList = { _id: string; title: string; fileName: string; uploadedBy?: Person; assignedTo?: Person | null; rowCount: number; originalRowCount: number | null; convertedCount: number; unconvertedCount: number; deletedCount: number | null; totalCallingCount: number | null; calledCount: number; interestedCount: number; followUpCount: number; notCalledCount: number; createdAt: string };
+export type CallingList = { candidateStorage?: 'S3' | 'DATABASE'; assignmentSource?: 'AUTO' | 'MANUAL'; _id: string; title: string; fileName: string; uploadedBy?: Person; assignedTo?: Person | null; rowCount: number; originalRowCount: number | null; convertedCount: number; unconvertedCount: number; deletedCount: number | null; totalCallingCount: number | null; calledCount: number; interestedCount: number; followUpCount: number; notCalledCount: number; createdAt: string };
 export type Candidate = { _id: string; rowNumber: number; values: string[]; employee?: string | null; callStatus?: CallStatus; callNote?: string; nextFollowUpAt?: string | null; lastCalledAt?: string | null };
-export type CallingPreview = { _id: string; title: string; headers: string[]; rows: Candidate[]; total: number; page: number; limit: number };
+export type CallingPreview = { readOnly?: boolean; _id: string; title: string; headers: string[]; rows: Candidate[]; total: number; page: number; limit: number };
 export type CpDraft = { firstName: string; lastName: string; email: string; mobileNumber: string; addressLine: string; state: string; district: string; city: string; pincode: string };
 export function personName(person?: Person | null) { return person ? [person.firstName, person.lastName].filter(Boolean).join(' ') || person.employeeCode || person._id : 'Unassigned'; }
 export function candidateDraft(headers: string[], values: string[]): CpDraft {
