@@ -88,6 +88,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
   const [related, setRelated] = useState<unknown>(null);
   const [relatedError, setRelatedError] = useState('');
   const [relatedBusy, setRelatedBusy] = useState(false);
+  const [downloadingQuotation, setDownloadingQuotation] = useState(false);
   const [documentPreview, setDocumentPreview] = useState<{ documentId: string; url: string; contentType: string; fileName: string } | null>(null);
   const [generateQuotation, setGenerateQuotation] = useState(false);
   const [leadStatus, setLeadStatus] = useState('');
@@ -137,8 +138,23 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
     const link = document.createElement('a');
     link.href = url;
     link.download = file.name;
+    document.body.appendChild(link);
     link.click();
+    link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function downloadQuotation() {
+    if (downloadingQuotation) return;
+    setDownloadingQuotation(true);
+    setRelatedError('');
+    try {
+      const pdf = await api.getBlob(`/quotations/${encodeURIComponent(id)}/file`);
+      const number = String(record?.quotationNumber ?? 'quotation').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'quotation';
+      downloadQuotationFile(new File([pdf], `${number}.pdf`, { type: 'application/pdf' }));
+    } catch (cause) {
+      setRelatedError(cause instanceof Error ? cause.message : 'Unable to download quotation PDF.');
+    } finally { setDownloadingQuotation(false); }
   }
 
   useEffect(() => {
@@ -234,7 +250,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
     leads: ['lead-status', 'lead-assignment', 'lead-edit', 'lead-convert'],
     visits: ['visit-edit'],
     customers: ['customer-edit'],
-    quotations: canSendQuotation ? ['quotation-share'] : [],
+    quotations: [],
     employees: ['employee-edit', 'employee-manager'],
     amc: ['amc-renew', 'amc-renewal-status', 'amc-schedule', 'amc-schedule-update', 'amc-service'],
   };
@@ -473,10 +489,6 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
       } else if (name === 'amc-cancel') {
         if (!window.confirm('Cancel this AMC contract and its scheduled services?')) return;
         await api.post(`/amc/${id}/cancel`);
-      } else if (name === 'quotation-download') {
-        const result = await api.get<{ url?: string; expiresInSeconds?: number }>(`/quotations/${id}/download-url`);
-        if (!result.data?.url) throw new Error('The API did not return a download URL.');
-        setRelated({ downloadUrl: result.data.url, expiresInSeconds: result.data.expiresInSeconds });
       } else if (name === 'employee-image') {
         const result = await api.get<{ url?: string; expiresInSeconds?: number }>(`/employees/${id}/profile-image-url`);
         if (!result.data?.url) throw new Error('No profile image download URL was returned.');
@@ -642,7 +654,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
               <div className="operation-toolbar">
                 {actionOptions[type].map((name) => <button className="filter-btn" key={name} onClick={() => { setRelated(null); setLeadStatus(''); setGenerateQuotation(false); setAction(action === name ? '' : name); }}>{actionTitle(name)}</button>)}
                 {type === 'employees' && <><button className="filter-btn" onClick={() => void directAction('employee-activate')}>Activate</button><button className="filter-btn" onClick={() => void directAction('employee-deactivate')}>Deactivate</button><button className="filter-btn" onClick={() => void directAction('employee-invite')}>Resend invitation</button><button className="filter-btn" onClick={() => void directAction('employee-image')}>Profile image</button></>}
-                {type === 'quotations' && <button className="filter-btn" onClick={() => void directAction('quotation-download')}><Download size={14}/> Download PDF</button>}
+                {type === 'quotations' && <button className="filter-btn" disabled={downloadingQuotation} onClick={() => void downloadQuotation()}><Download size={14}/> {downloadingQuotation ? 'Downloading...' : 'Download PDF'}</button>}
                 {type === 'amc' && <button className="filter-btn danger-btn" onClick={() => void directAction('amc-cancel')}>Cancel contract</button>}
               </div>
             ) : null}

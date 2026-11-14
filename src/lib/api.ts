@@ -42,7 +42,7 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
 }
 async function requestBlob(path: string, retry = true): Promise<Blob> {
   const headers = new Headers({ Accept: 'application/pdf' });
-  if (accessToken) headers.set('Authorization', `******`);
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   const response = await fetch(`${API_BASE}${path}`, { headers, credentials: 'include', cache: 'no-store', redirect: 'error' });
   if (response.status === 401 && retry && !path.startsWith('/auth/')) {
     const refreshed = await refreshAccessToken();
@@ -56,6 +56,7 @@ async function requestBlob(path: string, retry = true): Promise<Blob> {
     error.errors = body && typeof body === 'object' && 'errors' in body ? body.errors : undefined;
     throw error;
   }
+  if (!response.headers.get('Content-Type')?.toLowerCase().includes('application/pdf')) throw new Error('The API did not return a PDF file.');
   return response.blob();
 }
 export async function refreshAccessToken(): Promise<boolean> {

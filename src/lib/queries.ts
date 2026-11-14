@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 export const QUERY_ROLES = ['MD', 'RM', 'CP', 'CP_HEAD', 'MIS'];
 export type Person = { _id: string; firstName?: string; middleName?: string; lastName?: string; employeeCode?: string };
-export type QueryRecipient = Person & { roleCode: 'CP_HEAD' | 'MIS' };
+export type QueryRecipient = Person & { roleCode: 'CP_HEAD' | 'MIS' | 'RM' };
 export type QueryThread = { _id: string; title: string; createdBy: Person; assignedTo: Person; recipientRole: string; lastMessageAt: string };
 export type QueryMessage = { _id: string; sender: Person; body: string; createdAt: string };
 export type PageMeta = { page: number; limit: number; total: number; totalPages: number };

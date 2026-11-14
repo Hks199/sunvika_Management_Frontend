@@ -28,3 +28,16 @@ export function totalCalling(list: Pick<CallingList, 'deletedCount' | 'converted
 export type CallStatus = 'NOT_CALLED' | 'INTERESTED' | 'NEEDS_FOLLOWUP' | 'NOT_INTERESTED';
 export const CALL_STATUSES: { value: CallStatus; label: string }[] = [{ value: 'NOT_CALLED', label: 'Not called' }, { value: 'INTERESTED', label: 'Interested' }, { value: 'NEEDS_FOLLOWUP', label: 'Needs follow-up' }, { value: 'NOT_INTERESTED', label: 'Not interested' }];
 export function callStatusLabel(candidate: Candidate) { return candidate.employee ? 'Converted to CP' : CALL_STATUSES.find(option => option.value === (candidate.callStatus ?? 'NOT_CALLED'))?.label ?? 'Not called'; }
+
+export function candidatePhoneNumber(headers: string[], values: string[]): string | null {
+  const normalized = headers.map(header => header.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  for (const alias of ['mobilenumber','mobile','phone','phonenumber','contactnumber','contact','mobile no','phone no','contact no','whatsappnumber'].map(value => value.replace(/ /g, ''))) {
+    const index = normalized.indexOf(alias);
+    if (index < 0) continue;
+    const value = (values[index] ?? '').trim().replace(/^'/, '');
+    if (!/^\+?[0-9\s().-]+$/.test(value)) continue;
+    const number = value.replace(/[\s().-]/g, '');
+    if (/^\+?[0-9]{10,15}$/.test(number)) return number;
+  }
+  return null;
+}
