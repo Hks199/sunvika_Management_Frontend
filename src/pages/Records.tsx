@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, ChevronLeft, ChevronRight, CircleAlert, Plus, RefreshCw, Search, SlidersHorizontal } from 'lucide-react';
 import { api } from '../lib/api';
 import { displayValue } from '../lib/display';
+import CpBulkImport from '../components/CpBulkImport';
 import CreateDialog from '../components/CreateDialog';
 import RecordDetails from '../components/RecordDetails';
 import EmployeeCreateDialog from '../components/EmployeeCreateDialog';
@@ -48,6 +49,7 @@ export default function Records({type}:{type:string}){
      {config.createPath&&(type!=='channel-partners'||roleCode==='RM')&&<button className="primary-btn" onClick={()=>setCreating(true)}><Plus size={16}/>New {type==='amc'?'contract':type==='leads'?'lead':type==='visits'?'visit':type==='channel-partners'?'CP':'employee'}</button>}
     </div>
    </div>
+   {type==='channel-partners'&&['MD','CP_HEAD','RM'].includes(roleCode??'')&&<CpBulkImport onImported={()=>void load()}/>}
    <section className="panel records-panel">
     <div className="records-toolbar">
      {(type==='leads'||type==='customers')?<div className="search-field"><Search size={16}/><input aria-label={`Search ${config.title}`} placeholder={`Search ${config.title.toLowerCase()}…`} value={search} maxLength={100} onChange={e=>{setPage(1);setSearch(e.target.value)}}/><kbd>⌘ K</kbd></div>:<div/>}
