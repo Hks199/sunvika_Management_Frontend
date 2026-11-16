@@ -4,7 +4,7 @@ React, TypeScript, Vite, and Tailwind CSS frontend for the Sunvika Management AP
 
 ## Backend contract reviewed
 
-The frontend is based on `D:\sunvika\sunvika_Management_Backend\docs\API_DOCUMENTATION.md`, module documentation, route definitions, validations, and controllers. The API defaults to `http://localhost:5000/api/v1`; success responses use `{ success, message, data, meta }` and errors use `{ success, message, errors, meta }`.
+The frontend is based on `D:\sunvika\sunvika_Management_Backend_copy\docs\API_DOCUMENTATION.md`, module documentation, route definitions, validations, and controllers. The API defaults to `http://localhost:5000/api/v1`; success responses use `{ success, message, data, meta }` and errors use `{ success, message, errors, meta }`.
 
 Implemented navigation and API connections cover:
 
@@ -50,6 +50,10 @@ npm run preview
 ```
 
 Serve the built `dist/` directory over HTTPS in production. Set the backend's `FRONTEND_URL` and `CORS_ORIGINS` to the deployed frontend origin. The backend production refresh cookie is `Secure` and `SameSite=None`, so frontend and API deployment must use HTTPS and credentialed CORS.
+
+## Deploy to Vercel
+
+The included `vercel.json` configures the Vite build and client-side route fallback. Set `VITE_API_URL` to your public HTTPS backend address including `/api/v1` in Vercel, and configure the backend frontend/CORS origins. Follow [the Vercel deployment guide](docs/VERCEL_DEPLOYMENT.md) for the complete setup, authentication, uploads, workers and mobile configuration.
 
 ## Deploy to Netlify
 
