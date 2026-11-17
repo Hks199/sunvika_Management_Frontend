@@ -1,3 +1,5 @@
+import EmployeeProfileImageEditor from './EmployeeProfileImageEditor';
+import EmployeeProfileImagePreview from './EmployeeProfileImagePreview';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Download, ExternalLink, RefreshCw, Share2, X } from 'lucide-react';
 import { api } from '../lib/api';
@@ -94,6 +96,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
   const [leadStatus, setLeadStatus] = useState('');
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageError, setProfileImageError] = useState('');
+  const [showProfileImage, setShowProfileImage] = useState(false);
 
   const role = record?.role;
   const isChannelPartner = type === 'employees' && (channelPartner || role === 'CP' || (role && typeof role === 'object' && 'code' in role && role.code === 'CP'));
@@ -490,10 +493,8 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
         if (!window.confirm('Cancel this AMC contract and its scheduled services?')) return;
         await api.post(`/amc/${id}/cancel`);
       } else if (name === 'employee-image') {
-        const result = await api.get<{ url?: string; expiresInSeconds?: number }>(`/employees/${id}/profile-image-url`);
-        if (!result.data?.url) throw new Error('No profile image download URL was returned.');
-        setProfileImageUrl(result.data.url);
-        setProfileImageError('');
+        setShowProfileImage(true);
+        return;
       }
       await loadRecord();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'The requested action failed'); }
@@ -504,6 +505,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
       if (event.target === event.currentTarget) onClose();
     }}>
       <section className="create-modal details-modal" role="dialog" aria-modal="true" aria-labelledby="record-details-title">
+        {showProfileImage && <EmployeeProfileImagePreview employeeId={id} onClose={() => setShowProfileImage(false)}/>}
         <div className="modal-heading">
           <div>
             <div className="eyebrow">RECORD DETAILS</div>
@@ -524,6 +526,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
                 <button className="filter-btn" onClick={() => void directAction('employee-image')}>Refresh image</button>
               </section>
             )}
+            {type === 'employees' && <EmployeeProfileImageEditor key={id} employeeId={id} onSaved={async()=>{await loadRecord();onSaved?.();}}/>}
             <dl className="details-list">
               {fields.map(([key, value]) => (
                 <div className="details-item" key={key}>

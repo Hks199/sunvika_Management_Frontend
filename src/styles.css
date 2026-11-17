@@ -108,3 +108,9 @@
 .calling-list-filters{margin:16px 0 20px;align-items:flex-end}.calling-list-filters .searchable-select{max-width:320px}
 
 .calling-table .candidate-dial-column{min-width:68px;width:68px;text-align:center}.candidate-dial{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid #86efac;border-radius:12px;background:#dcfce7;color:#15803d;text-decoration:none;cursor:pointer}.candidate-dial:hover{background:#bbf7d0}.candidate-dial:focus-visible{outline:3px solid #16a34a;outline-offset:2px}.candidate-dial:disabled{background:#f1f5f9;border-color:#e2e8f0;color:#94a3b8}
+.employee-photo-dialog{border:0;border-radius:16px;padding:0;width:min(560px,calc(100% - 32px));max-height:90dvh;box-shadow:0 24px 70px #0004;color:var(--ink)}
+.employee-photo-dialog::backdrop{background:#102635b3}
+.employee-photo-content{padding:20px;display:flex;flex-direction:column;gap:16px}
+.employee-photo-content h2{margin:0;font-size:20px}
+.employee-photo-content>img{width:100%;max-height:65dvh;object-fit:contain;border-radius:10px;background:#f4f7f6}
+.employee-photo-content>.filter-btn{align-self:flex-start}
