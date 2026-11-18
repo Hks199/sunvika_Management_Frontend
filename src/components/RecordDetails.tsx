@@ -1,4 +1,5 @@
 import EmployeeProfileImageEditor from './EmployeeProfileImageEditor';
+import VisitHistory from './VisitHistory';
 import EmployeeProfileImagePreview from './EmployeeProfileImagePreview';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Download, ExternalLink, RefreshCw, Share2, X } from 'lucide-react';
@@ -90,6 +91,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
   const [related, setRelated] = useState<unknown>(null);
   const [relatedError, setRelatedError] = useState('');
   const [relatedBusy, setRelatedBusy] = useState(false);
+  const [visitHistoryScope, setVisitHistoryScope] = useState<'lead' | 'employee'>('lead');
   const [downloadingQuotation, setDownloadingQuotation] = useState(false);
   const [documentPreview, setDocumentPreview] = useState<{ documentId: string; url: string; contentType: string; fileName: string } | null>(null);
   const [generateQuotation, setGenerateQuotation] = useState(false);
@@ -270,6 +272,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
   };
 
   async function loadRelated(path: string) {
+    if (type === 'visits') setVisitHistoryScope(path.includes('/visits/employees/') ? 'employee' : 'lead');
     setRelatedBusy(true);
     setRelatedError('');
     setRelated(null);
@@ -817,7 +820,8 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
                 <p className="form-hint">No status changes have been recorded for this lead yet.</p>
               )
             )}
-            {relatedRecord && !quotationFile && !isQuotationShareHistory && !isLeadStatusHistory && <pre className="json-result">{displayJson(related)}</pre>}
+            {type === 'visits' && (relatedBusy || related !== null) && <VisitHistory rows={relatedRows} scope={visitHistoryScope} loading={relatedBusy}/>}
+            {type !== 'visits' && relatedRecord && !quotationFile && !isQuotationShareHistory && !isLeadStatusHistory && <pre className="json-result">{displayJson(related)}</pre>}
             {canSendQuotation && quotationFile && (
               <div className="related-toolbar">
                 <button className="primary-btn" onClick={() => void shareQuotationFile(quotationFile)}><Share2 size={14}/> Share PDF</button>
