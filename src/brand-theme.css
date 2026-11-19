@@ -233,3 +233,83 @@
     transition: none;
   }
 }
+
+/* Sunvika's navy and orange bring the workspace together. */
+:root {
+  --brand-navy: #080875;
+  --brand-navy-deep: #07075c;
+  --brand-orange: #ff7000;
+  --brand-orange-soft: #fff1e5;
+  --ink: #171b4b;
+  --green: #161681;
+  --line: #e3e5f2;
+}
+
+.app-shell {
+  background: #f5f6fc;
+}
+
+.sidebar {
+  border-right-color: #e2e5f2;
+  box-shadow: 4px 0 24px rgb(8 8 117 / 3%);
+}
+
+.sidebar-brand {
+  border-bottom: 2px solid #fff1e5;
+  margin-bottom: 18px;
+}
+
+.workspace-switch {
+  background: #f8f8ff;
+  border-color: #e6e7f5;
+}
+
+.nav-heading { color: #8589a7; }
+.nav-link { color: #606987; }
+.nav-link.active { background: #ebebfb; }
+
+.topbar {
+  border-bottom-color: #e6e7f2;
+  box-shadow: 0 3px 16px rgb(8 8 117 / 3%);
+}
+
+.page-heading h1,
+.metric-value,
+.panel-heading h2,
+.welcome-copy h2 {
+  color: #171b4b;
+}
+
+.primary-btn {
+  background: linear-gradient(115deg, #080875, #29299a);
+  box-shadow: 0 5px 16px rgb(8 8 117 / 22%);
+}
+.primary-btn:hover { background: linear-gradient(115deg, #07075c, #1c1c82); }
+
+.metric-card,
+.panel,
+.quick-card {
+  border-color: #e6e7f2;
+  box-shadow: 0 5px 20px rgb(8 8 117 / 5%);
+}
+
+.metric-card { border-top: 3px solid #c9c9ed; }
+.metric-card.tone-2 { border-top-color: var(--brand-orange); }
+.metric-icon, .focus-icon, .quick-icon.mint { background: #eeeeff; color: var(--brand-navy); }
+.tone-1 .metric-icon, .tone-3 .metric-icon { background: #f0f0ff; color: #343498; }
+.tone-2 .metric-icon { background: var(--brand-orange-soft); color: #b94a00; }
+
+.welcome-panel {
+  background: linear-gradient(115deg, #fff 42%, #fff7ef 100%);
+}
+.welcome-sun { background: linear-gradient(135deg, #ffca82, #ff7000); }
+.welcome-sun span { background: #33339a; }
+.orbit, .orbit-two { border-color: #dedff3; }
+.query-list-item.selected { background: #eeeeff; }
+.calling-table th { background: #f2f2fc; color: #33376b; }
+.searchable-select-popup li.is-focused { background: #eeeeff; color: var(--brand-navy); }
+
+.announcement-bar:not(.announcement-target):not(.announcement-motivation):not(.announcement-empty) {
+  background: linear-gradient(115deg, #080875, #29299a);
+  border-bottom-color: var(--brand-orange);
+}

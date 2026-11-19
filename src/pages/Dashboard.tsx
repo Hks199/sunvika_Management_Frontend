@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { Activity, ArrowUpRight, BadgeCheck, BriefcaseBusiness, CalendarClock, ContactRound, FileText, RefreshCw, Users } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../state/auth';
+import { branchPipeline } from '../lib/branch-pipeline';
 
 type RecordValue = Record<string, unknown>;
 function flatten(value: unknown): RecordValue { return value && typeof value === 'object' && !Array.isArray(value) ? value as RecordValue : {}; }
 function number(value: unknown) { return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '—'; }
-function rows(value: unknown): RecordValue[] { return Array.isArray(value) ? value.filter((row): row is RecordValue => Boolean(row) && typeof row === 'object') as RecordValue[] : []; }
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -31,7 +31,7 @@ export default function Dashboard() {
   const leads = flatten(summary?.leads);
   const customers = flatten(summary?.customers);
   const quotations = flatten(summary?.quotations);
-  const branches = rows(summary?.branchPerformance);
+  const branches = branchPipeline(summary?.branchPerformance);
   const maxLeads = Math.max(1, ...branches.map((branch) => typeof branch.leads === 'number' ? branch.leads : 0));
   const metrics = [
     ['Total leads', leads.total, ContactRound],
@@ -55,18 +55,19 @@ export default function Dashboard() {
     </section>
     <section className="dashboard-grid">
       <article className="panel performance-panel">
-        <div className="panel-heading"><div><h2>Branch pipeline</h2><p>Leads and conversions from the dashboard API</p></div><span className="live-pill"><span className="status-dot"/> LIVE</span></div>
+        <div className="panel-heading"><div><h2>Branch pipeline</h2><p>Total leads and leads converted to customers within your access.</p></div><span className="live-pill"><span className="status-dot"/> LIVE</span></div>
         {branches.length ? <div className="branch-performance">
-          {branches.slice(0, 8).map((branch, index) => {
-            const count = typeof branch.leads === 'number' ? branch.leads : 0;
-            const converted = typeof branch.converted === 'number' ? branch.converted : 0;
-            return <div className="branch-performance-row" key={String(branch._id ?? branch.name ?? index)}>
-              <div className="branch-performance-label"><b>{String(branch.name ?? 'Unassigned branch')}</b><span>{number(converted)} converted · {number(count)} leads</span></div>
-              <div className="branch-performance-track"><i style={{ width: `${Math.min(100, count / maxLeads * 100)}%` }}/></div>
+          {branches.map((branch) => {
+            const count = branch.leads;
+            const converted = branch.converted;
+            return <div className="branch-performance-row" key={branch._id}>
+              <div className="branch-performance-label"><b>{branch.name}</b><span>{number(converted)} converted · {number(count)} leads</span></div>
+              <div className="branch-performance-track" role="img" aria-label={`${number(count)} total leads`}><i style={{ width: `${Math.min(100, (count ?? 0) / maxLeads * 100)}%` }}/></div>
+              <div className="branch-performance-track" role="img" aria-label={`${number(converted)} leads converted to customers`}><i className="branch-converted-bar" style={{ width: `${Math.min(100, (converted ?? 0) / maxLeads * 100)}%` }}/></div>
             </div>;
           })}
         </div> : <div className="branch-performance-empty">{loading ? 'Loading branch performance…' : 'No branch performance data is available for this account.'}</div>}
-        <div className="chart-legend"><span><i className="legend-leads"/> Leads</span><span><i className="legend-visits"/> Converted leads</span></div>
+        <div className="chart-legend"><span><i className="legend-leads"/> Total leads</span><span><i className="legend-visits"/> Converted to customers</span></div>
       </article>
       <article className="panel focus-panel">
         <div className="panel-heading"><div><h2>Today’s focus</h2><p>Open your live work queues</p></div><span className="focus-icon"><Activity size={17}/></span></div>
