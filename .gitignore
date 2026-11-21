@@ -5,3 +5,6 @@ dist/
 
 # Vercel local project settings
 .vercel/
+
+# Local Gradle dependency cache
+artifacts/gradle-home/
