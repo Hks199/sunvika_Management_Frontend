@@ -1,3 +1,5 @@
+import type { Policy } from './QuotationPolicy';
+import { QuotationOptions, type Options } from './QuotationOptions';
 import EmployeeProfileImageEditor from './EmployeeProfileImageEditor';
 import VisitHistory from './VisitHistory';
 import EmployeeProfileImagePreview from './EmployeeProfileImagePreview';
@@ -38,12 +40,19 @@ const actionFields: Record<string, Field[]> = {
   'amc-service': [{ name: 'serviceDate', label: 'Service date', type: 'date', required: true }, { name: 'performedBy', label: 'Employee ID', required: true }, { name: 'scheduleId', label: 'Schedule ID' }, { name: 'outcome', label: 'Outcome', required: true }, { name: 'notes', label: 'Notes' }, { name: 'partsUsed', label: 'Parts used (comma-separated)' }],
 };
 const leadQuotationFields: Field[] = [
+  { name: 'systemType', label: 'System type', type: 'select', required: true },
+  { name: 'phase', label: 'Phase', type: 'select', required: true, options: ['1-Phase', '3-Phase'] },
+  { name: 'category', label: 'Category', type: 'select', required: true },
+  { name: 'inverterBattery', label: 'Inverter battery' },
   { name: 'requiredCapacityKW', label: 'Required capacity (kW)', type: 'number', required: true },
-  { name: 'ratePerKW', label: 'Rate per kW', type: 'number', required: true },
-  { name: 'paymentMode', label: 'Payment mode', required: true },
-  { name: 'panelBrand', label: 'Panel brand', required: true },
-  { name: 'panelTechnology', label: 'Panel technology', required: true },
-  { name: 'termsAndConditions', label: 'Terms and conditions', required: true },
+  { name: 'rate', label: 'Rate', type: 'number', required: true },
+  { name: 'panelCount', label: 'Number of panels', type: 'number', required: true },
+  { name: 'wattsPerPanel', label: 'Watts per panel', type: 'select', required: true },
+  { name: 'paymentMode', label: 'Payment mode', type: 'select', required: true },
+  { name: 'panelBrand', label: 'Panel brand', type: 'select', required: true },
+  { name: 'panelTechnology', label: 'Panel technology', type: 'select', required: true },
+  { name: 'inverter', label: 'Inverter', type: 'select', required: true },
+  { name: 'termsAndConditions', label: 'Remark', required: true },
 ];
 
 const actionLabels: Record<string, string> = {
@@ -95,11 +104,18 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
   const [downloadingQuotation, setDownloadingQuotation] = useState(false);
   const [documentPreview, setDocumentPreview] = useState<{ documentId: string; url: string; contentType: string; fileName: string } | null>(null);
   const [generateQuotation, setGenerateQuotation] = useState(false);
+  const [quotationPolicy, setQuotationPolicy] = useState<Policy | null>(null);
+  const [quoteCapacity, setQuoteCapacity] = useState('');
+  const [quoteRate, setQuoteRate] = useState('');
+  useEffect(() => { if (type === 'leads') void api.get<Policy>('/quotations/policy').then(r => setQuotationPolicy(r.data)).catch(() => setError('Could not load quotation policy.')); }, [type]);
+  const [quotationOptions, setQuotationOptions] = useState<Options>({ paymentModes: [], panelBrands: [], panelTechnologies: [], inverters: [], wattsOptions: [], categories: [], systemTypes: [] });
+  useEffect(() => { if (type === 'leads') void api.get<Options>('/quotations/options').then(r => setQuotationOptions(r.data)).catch(() => setError('Could not load quotation options.')); }, [type]);
   const [leadStatus, setLeadStatus] = useState('');
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageError, setProfileImageError] = useState('');
   const [showProfileImage, setShowProfileImage] = useState(false);
 
+  const quoteRule = quotationPolicy?.rules.find(rule => rule.stateId === referencedId(record?.state) && Number(quoteCapacity) >= rule.minKW && Number(quoteCapacity) <= rule.maxKW);
   const role = record?.role;
   const isChannelPartner = type === 'employees' && (channelPartner || role === 'CP' || (role && typeof role === 'object' && 'code' in role && role.code === 'CP'));
   const employeeName = isChannelPartner ? 'Channel Partner' : 'Employee';
@@ -364,17 +380,18 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
         if (shouldGenerateQuotation) {
           if (body.status !== 'QUOTATION_SENT') throw new Error('Quotation generation is only available when moving a lead to quotation stage.');
           const quotation: Record<string, unknown> = {};
-          for (const key of ['requiredCapacityKW', 'ratePerKW']) {
+          for (const key of ['requiredCapacityKW', 'rate', 'panelCount', 'wattsPerPanel']) {
             const value = Number(body[key]);
-            if (!Number.isFinite(value)) throw new Error(`Enter a valid ${key === 'ratePerKW' ? 'rate per kW' : 'capacity'}.`);
+            if (!Number.isFinite(value)) throw new Error(`Enter a valid ${label(key).toLowerCase()}.`);
             quotation[key] = value;
             delete body[key];
           }
-          for (const key of ['paymentMode', 'panelBrand', 'panelTechnology', 'termsAndConditions']) {
+          for (const key of ['paymentMode', 'panelBrand', 'panelTechnology', 'inverter', 'systemType', 'phase', 'category', 'termsAndConditions']) {
             if (typeof body[key] !== 'string' || !body[key].trim()) throw new Error(`Enter ${label(key).toLowerCase()}.`);
             quotation[key] = body[key];
             delete body[key];
           }
+          if (typeof body.inverterBattery === 'string') { quotation.inverterBattery = body.inverterBattery; delete body.inverterBattery; }
           body.quotation = quotation;
         }
         await api.patch(`/leads/${id}/status`, body);
@@ -491,7 +508,8 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
     try {
       if (name === 'employee-activate' || name === 'employee-deactivate' || name === 'employee-invite') {
         const path = name === 'employee-invite' ? 'resend-invitation' : name === 'employee-activate' ? 'activate' : 'deactivate';
-        await api.post(`/employees/${id}/${path}`);
+        const response = await api.post<{ invitationSent?: boolean }>(`/employees/${id}/${path}`);
+        if (name === 'employee-invite' && !response.data.invitationSent) throw new Error('The invitation email could not be sent. Check email configuration and try again.');
       } else if (name === 'amc-cancel') {
         if (!window.confirm('Cancel this AMC contract and its scheduled services?')) return;
         await api.post(`/amc/${id}/cancel`);
@@ -533,7 +551,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
             <dl className="details-list">
               {fields.map(([key, value]) => (
                 <div className="details-item" key={key}>
-                  <dt>{isChannelPartner && key === 'employeeCode' ? 'CP code' : label(key)}</dt>
+                  <dt>{isChannelPartner && key === 'employeeCode' ? 'CP code' : type === 'quotations' && key === 'termsAndConditions' && record?.rate != null ? 'Remark' : label(key)}</dt>
                   <dd>{display(value)}</dd>
                 </div>
               ))}
@@ -658,7 +676,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
             {type === 'customers' && ['quotations', 'amcContracts'].map(key => <section key={key}><h3>{key === 'quotations' ? 'Quotation history' : 'AMC history'}</h3>{customerContextRows(key).length ? customerContextRows(key).map((item, index) => <dl className="details-list" key={String(item._id ?? index)}>{Object.entries(item).filter(([field]) => field !== "_id").map(([field, value]) => <div className="details-item" key={field}><dt>{label(field)}</dt><dd>{display(value)}</dd></div>)}</dl>) : <p>No records yet.</p>}</section>)}
             {actionOptions[type]?.length || type === 'quotations' ? (
               <div className="operation-toolbar">
-                {actionOptions[type].map((name) => <button className="filter-btn" key={name} onClick={() => { setRelated(null); setLeadStatus(''); setGenerateQuotation(false); setAction(action === name ? '' : name); }}>{actionTitle(name)}</button>)}
+                {actionOptions[type].map((name) => <button className="filter-btn" key={name} onClick={() => { setRelated(null); setLeadStatus(''); setGenerateQuotation(false); setQuoteCapacity(''); setQuoteRate(''); setAction(action === name ? '' : name); }}>{actionTitle(name)}</button>)}
                 {type === 'employees' && <><button className="filter-btn" onClick={() => void directAction('employee-activate')}>Activate</button><button className="filter-btn" onClick={() => void directAction('employee-deactivate')}>Deactivate</button><button className="filter-btn" onClick={() => void directAction('employee-invite')}>Resend invitation</button><button className="filter-btn" onClick={() => void directAction('employee-image')}>Profile image</button></>}
                 {type === 'quotations' && <button className="filter-btn" disabled={downloadingQuotation} onClick={() => void downloadQuotation()}><Download size={14}/> {downloadingQuotation ? 'Downloading...' : 'Download PDF'}</button>}
                 {type === 'amc' && <button className="filter-btn danger-btn" onClick={() => void directAction('amc-cancel')}>Cancel contract</button>}
@@ -674,8 +692,8 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
                   {action === 'quotation-share' && <p className="form-hint">The device share menu asks you to choose WhatsApp and the recipient. This number is only for the chat-link fallback; WhatsApp cannot pre-attach a PDF to a selected chat.</p>}
                   {action === 'lead-status' && leadStatus === 'QUOTATION_SENT' && (
                     <>
-                      <label className="field-wide"><span><input type="checkbox" name="generateQuotation" checked={generateQuotation} onChange={(event) => setGenerateQuotation(event.currentTarget.checked)}/> Generate quotation now</span></label>
-                      {generateQuotation && leadQuotationFields.map((field) => <label key={field.name}>{field.label}{field.name === 'termsAndConditions' ? <textarea name={field.name} required maxLength={5000} minLength={10}/> : <input name={field.name} type={field.type ?? 'text'} required={field.required} min={field.type === 'number' ? '0' : undefined} max={field.name === 'requiredCapacityKW' ? '100000' : field.name === 'ratePerKW' ? '100000000' : undefined} step={field.type === 'number' ? 'any' : undefined} maxLength={field.type === 'number' ? undefined : 100}/>}</label>)}
+                      <label className="field-wide"><span><input type="checkbox" name="generateQuotation" checked={generateQuotation} onChange={(event) => { setGenerateQuotation(event.currentTarget.checked); }}/> Generate quotation now</span></label>
+                      {generateQuotation && <><p className="form-hint field-wide">Rate is the total project price.</p>{(!quotationOptions.panelBrands.length || !quotationOptions.panelTechnologies.length || !quotationOptions.inverters.length || !quotationOptions.wattsOptions.length || !quotationOptions.categories.length || !quotationOptions.systemTypes.length) && <p className="form-hint field-wide">An MD must add panel brand, technology, inverter, wattage, category and system type options before a quotation can be generated.</p>}{roleCode === 'MD' && <QuotationOptions options={quotationOptions} onChange={setQuotationOptions}/>} {quoteCapacity && (quoteRule ? <p className="form-hint field-wide">Estimated central subsidy: Rs. {quoteRule.central.toLocaleString('en-IN')} ? State subsidy: Rs. {quoteRule.state.toLocaleString('en-IN')} {quoteRate ? `? Estimated net cost: Rs. ${(Number(quoteRate) - quoteRule.central - quoteRule.state).toLocaleString('en-IN')}` : ''}. Subject to eligibility and approval.</p> : <p className="form-error field-wide">No subsidy setting matches this state and capacity. Ask MD to configure quotation settings.</p>)} {leadQuotationFields.map(field => <label key={field.name}>{field.label}{field.type === 'select' ? <select name={field.name} required defaultValue=""><option value="">Choose?</option>{(field.name === 'phase' ? (field.options ?? []) : field.name === 'paymentMode' ? quotationOptions.paymentModes : field.name === 'panelBrand' ? quotationOptions.panelBrands : field.name === 'panelTechnology' ? quotationOptions.panelTechnologies : field.name === 'wattsPerPanel' ? quotationOptions.wattsOptions : field.name === 'category' ? quotationOptions.categories : field.name === 'systemType' ? quotationOptions.systemTypes : quotationOptions.inverters).map(option => <option key={option} value={option}>{option}</option>)}</select> : field.name === 'termsAndConditions' ? <textarea name={field.name} required maxLength={5000}/> : <input name={field.name} type={field.type ?? 'text'} required min={field.name === 'rate' ? 0 : field.name === 'requiredCapacityKW' ? 0.001 : field.type === 'number' ? 1 : undefined} step={field.name === 'panelCount' ? 1 : field.type === 'number' ? 'any' : undefined} maxLength={field.type === 'number' ? undefined : 100} onChange={field.name === 'requiredCapacityKW' ? event => setQuoteCapacity(event.target.value) : field.name === 'rate' ? event => setQuoteRate(event.target.value) : undefined}/>}</label>)}</>}
                     </>
                   )}
                 </div>

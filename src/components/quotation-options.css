@@ -1,0 +1,7 @@
+.quotation-options { width: 100%; }
+.quotation-options > div { display: grid; gap: 14px; margin-top: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.quotation-options > div p { margin: 0; color: var(--muted); font-size: 13px; }
+.quotation-options > div label { display: grid; gap: 6px; color: var(--ink); font-size: 13px; font-weight: 700; }
+.quotation-options textarea { width: 100%; min-height: 84px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; resize: vertical; }
+.quotation-options .quotation-options-save { justify-self: start; min-width: 150px; min-height: 44px; font-size: 14px; }
+.quotation-options [role='alert'] { color: #d04444; }
