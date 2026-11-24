@@ -1,3 +1,4 @@
+import CpCustomers from './CpCustomers';
 import type { Policy } from './QuotationPolicy';
 import { QuotationOptions, type Options } from './QuotationOptions';
 import EmployeeProfileImageEditor from './EmployeeProfileImageEditor';
@@ -25,9 +26,9 @@ type RecordValue = Record<string, unknown>;
 type Field = { name: string; label: string; type?: string; required?: boolean; options?: string[] };
 const actionFields: Record<string, Field[]> = {
   'lead-status': [{ name: 'status', label: 'New status', type: 'select', required: true, options: ['PENDING', 'INTERESTED', 'NOT_INTERESTED', 'SITE_VISITED', 'NEED_FOLLOWUP', 'QUOTATION_SENT', 'LOST'] }, { name: 'remark', label: 'Status note', required: true }, { name: 'nextFollowUpDate', label: 'Next follow-up', type: 'datetime-local' }],
-  'lead-assignment': [{ name: 'assignedTo', label: 'Employee ID', required: true }],
+  'lead-assignment': [{ name: 'assignedTo', label: 'Assign to', required: true }],
   'lead-edit': [{ name: 'customerName', label: 'Customer name' }, { name: 'mobileNumber', label: 'Mobile number' }, { name: 'alternateNumber', label: 'Alternate number' }, { name: 'blockOrTehsil', label: 'Block / tehsil' }, { name: 'siteAddress', label: 'Site address' }],
-  'lead-convert': [{ name: 'requiredCapacityKW', label: 'Capacity (kW)', type: 'number', required: true }, { name: 'ratePerKW', label: 'Rate per kW', type: 'number', required: true }, { name: 'paymentMode', label: 'Payment mode', required: true }, { name: 'panelBrand', label: 'Panel brand', required: true }, { name: 'panelTechnology', label: 'Panel technology', required: true }, { name: 'remark', label: 'Conversion note', required: true }, { name: 'document_PAN', label: 'PAN card (required)', type: 'file', required: true }, { name: 'document_AADHAAR', label: 'Aadhaar card (required)', type: 'file', required: true }, { name: 'document_ELECTRICITY_BILL', label: 'Electricity bill (required)', type: 'file', required: true }, { name: 'document_BANK_PASSBOOK', label: 'Bank passbook (required)', type: 'file', required: true }],
+  'lead-convert': [{ name: 'systemType', label: 'System type', type: 'select', required: true }, { name: 'phase', label: 'Phase', type: 'select', required: true }, { name: 'category', label: 'Category', type: 'select', required: true }, { name: 'inverterBattery', label: 'Inverter battery' }, { name: 'requiredCapacityKW', label: 'Required capacity (kW)', type: 'number', required: true }, { name: 'rate', label: 'Rate', type: 'number', required: true }, { name: 'panelCount', label: 'Number of panels', type: 'number', required: true }, { name: 'wattsPerPanel', label: 'Watts per panel', type: 'select', required: true }, { name: 'paymentMode', label: 'Payment mode', type: 'select', required: true }, { name: 'panelBrand', label: 'Panel brand', type: 'select', required: true }, { name: 'panelTechnology', label: 'Panel technology', type: 'select', required: true }, { name: 'inverter', label: 'Inverter', type: 'select', required: true }, { name: 'quotationRemark', label: 'Remark', required: true }, { name: 'remark', label: 'Conversion note', required: true }, { name: 'document_PAN', label: 'PAN card (required)', type: 'file', required: true }, { name: 'document_AADHAAR', label: 'Aadhaar card (required)', type: 'file', required: true }, { name: 'document_ELECTRICITY_BILL', label: 'Electricity bill (required)', type: 'file', required: true }, { name: 'document_BANK_PASSBOOK', label: 'Bank passbook (required)', type: 'file', required: true }, { name: 'document_GEO_TAG_PHOTO', label: 'Geotag photo (required)', type: 'file', required: true }],
   'visit-edit': [{ name: 'visitDate', label: 'Visit date', type: 'datetime-local' }, { name: 'nextVisitDate', label: 'Next visit', type: 'datetime-local' }, { name: 'remark', label: 'Visit remarks' }],
   'customer-edit': [{ name: 'customerName', label: 'Customer name' }, { name: 'mobileNumber', label: 'Mobile number' }, { name: 'alternateNumber', label: 'Alternate number' }, { name: 'siteAddress', label: 'Site address' }, { name: 'blockOrTehsil', label: 'Block / tehsil' }, { name: 'requiredCapacityKW', label: 'Capacity (kW)', type: 'number' }, { name: 'ratePerKW', label: 'Rate per kW', type: 'number' }, { name: 'paymentMode', label: 'Payment mode' }, { name: 'panelBrand', label: 'Panel brand' }, { name: 'panelTechnology', label: 'Panel technology' }, { name: 'status', label: 'Status', type: 'select', options: ['ONBOARDING', 'ACTIVE', 'COMPLETED', 'CANCELLED'] }],
   'quotation-share': [{ name: 'mobileNumber', label: 'WhatsApp number for chat-link fallback', required: true }],
@@ -90,6 +91,9 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
   const [convertCp, setConvertCp] = useState(false);
   const [convertCustomer, setConvertCustomer] = useState(false);
   const [customerHistory, setCustomerHistory] = useState(false);
+  const [cpCustomersOpen, setCpCustomersOpen] = useState(false);
+  const [selectedCpCustomer, setSelectedCpCustomer] = useState('');
+  const [cpCustomerRefresh, setCpCustomerRefresh] = useState(0);
   const [conversionNotice, setConversionNotice] = useState('');
   const [record, setRecord] = useState<RecordValue | null>(null);
   const [customerContext, setCustomerContext] = useState<RecordValue | null>(null);
@@ -97,6 +101,32 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
+  const [conversionQuote, setConversionQuote] = useState<RecordValue | null>(null);
+  const [conversionLoading, setConversionLoading] = useState(false);
+  const [conversionError, setConversionError] = useState('');
+  useEffect(() => {
+    if (action !== 'lead-convert') return;
+    let active = true; setConversionLoading(true); setConversionError(''); setConversionQuote(null);
+    void api.get<{ quotation: RecordValue | null }>(`/customers/from-lead/${encodeURIComponent(id)}/options`)
+      .then(r => { if (active) setConversionQuote(r.data.quotation); })
+      .catch(e => { if (active) setConversionError(e instanceof Error ? e.message : 'Unable to load quotation'); })
+      .finally(() => { if (active) setConversionLoading(false); });
+    return () => { active = false; };
+  }, [action, id]);
+
+  const [assignees, setAssignees] = useState<Array<{ _id: string; employeeCode: string; firstName: string; lastName: string; role?: { name?: string } }>>([]);
+  const [assigneesError, setAssigneesError] = useState('');
+  const [assigneesLoading, setAssigneesLoading] = useState(false);
+  useEffect(() => {
+    if (action !== 'lead-assignment') return;
+    let active = true; setAssigneesLoading(true); setAssigneesError(''); setAssignees([]);
+    void api.get<typeof assignees>(`/leads/${encodeURIComponent(id)}/assignment-options`)
+      .then(r => { if (active) setAssignees(r.data); })
+      .catch(e => { if (active) setAssigneesError(e instanceof Error ? e.message : 'Unable to load direct reports'); })
+      .finally(() => { if (active) setAssigneesLoading(false); });
+    return () => { active = false; };
+  }, [action, id]);
+
   const [related, setRelated] = useState<unknown>(null);
   const [relatedError, setRelatedError] = useState('');
   const [relatedBusy, setRelatedBusy] = useState(false);
@@ -231,7 +261,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
   const fields = record ? Object.entries(record).filter(([key]) => (
     !/password|token|secret|s3key|uploadId|^key$|^__v$|^_id$|^id$/i.test(key) &&
     key !== 'profileImage' &&
-    !(type === 'quotations' && ['version', 'totalProjectAmount'].includes(key))
+    !(type === 'quotations' && ['version', 'totalProjectAmount'].includes(key)) && !(type === 'customers' && record?.isFixedRate && key === 'ratePerKW')
   )) : [];
   const relatedRows = Array.isArray(related)
     ? related as RecordValue[]
@@ -336,15 +366,18 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
     }
   }
 
-  async function verifyDocument(document: RecordValue) {
+  async function verifyDocument(document: RecordValue, status: 'VERIFIED' | 'REJECTED' = 'VERIFIED') {
     const verificationId = String(document._id ?? document.id ?? '');
     if (!verificationId) { setRelatedError('The document ID is missing from the API response.'); return; }
-    if (document.verificationStatus === 'VERIFIED') return;
+    if (document.verificationStatus !== 'PENDING') return;
+    const remark = status === 'REJECTED' ? window.prompt('Enter the reason for rejection:') : '';
+    if (status === 'REJECTED' && !remark?.trim()) { if (remark !== null) setRelatedError('A rejection reason is required.'); return; }
     setRelatedBusy(true);
     setRelatedError('');
     try {
-      await api.patch(`/customers/${id}/documents/${encodeURIComponent(verificationId)}/verification`, { status: 'VERIFIED' });
+      await api.patch(`/customers/${id}/documents/${encodeURIComponent(verificationId)}/verification`, { status, ...(status === 'REJECTED' ? { remark: remark?.trim() } : {}) });
       await loadRecord();
+      onSaved?.();
       if (Array.isArray(related)) {
         const refreshed = await api.get<unknown>(`/customers/${id}/documents`);
         setRelated(refreshed.data);
@@ -354,6 +387,21 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
     } finally {
       setRelatedBusy(false);
     }
+  }
+
+  async function misReviewDocument(document: RecordValue, status: 'VERIFIED' | 'PENDING') {
+    const documentId = String(document._id ?? document.id ?? '');
+    if (!documentId) { setRelatedError('The document ID is missing.'); return; }
+    const remark = status === 'PENDING' ? window.prompt('Describe the issue with this file:') : '';
+    if (status === 'PENDING' && !remark?.trim()) { if (remark !== null) setRelatedError('A remark is required for a pending document.'); return; }
+    setRelatedBusy(true); setRelatedError('');
+    try {
+      await api.patch(`/customers/${id}/documents/${encodeURIComponent(documentId)}/mis-verification`, { status, ...(status === 'PENDING' ? { remark: remark?.trim() } : {}) });
+      await loadRecord();
+      if (Array.isArray(related)) setRelated((await api.get<unknown>(`/customers/${id}/documents`)).data);
+      onSaved?.();
+    } catch (cause) { setRelatedError(cause instanceof Error ? cause.message : 'Unable to save MIS review'); }
+    finally { setRelatedBusy(false); }
   }
 
   async function submitAction(event: FormEvent<HTMLFormElement>) {
@@ -409,12 +457,14 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
         if (action === 'visit-edit') for (const key of ['visitDate', 'nextVisitDate']) if (typeof body[key] === 'string') body[key] = new Date(body[key] as string).toISOString();
         await api.patch(`${paths[action]}/${id}`, body);
       } else if (action === 'lead-convert') {
-        for (const key of ['requiredCapacityKW', 'ratePerKW']) values[key] = Number(values[key]);
-        const documentTypes = ['PAN', 'AADHAAR', 'ELECTRICITY_BILL', 'BANK_PASSBOOK'] as const;
+        for (const key of ['requiredCapacityKW', 'rate', 'panelCount', 'wattsPerPanel']) values[key] = Number(values[key]);
+        values.ratePerKW = values.rate;
+        if (conversionQuote?.quotationId) values.quotationId = conversionQuote.quotationId;
+        const documentTypes = ['PAN', 'AADHAAR', 'ELECTRICITY_BILL', 'BANK_PASSBOOK', 'GEO_TAG_PHOTO'] as const;
         const files = documentTypes.map((documentType) => {
           const file = form.get(`document_${documentType}`);
           if (!(file instanceof File) || !file.size) throw new Error(`Choose the required ${label(documentType).toLowerCase()} document.`);
-          if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 20 * 1024 * 1024) {
+          if (!(documentType === 'GEO_TAG_PHOTO' ? ['image/jpeg', 'image/png', 'image/webp'] : ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']).includes(file.type) || file.size > 20 * 1024 * 1024) {
             throw new Error(`${label(documentType)} must be a PDF, JPEG, PNG, or WebP file no larger than 20 MB.`);
           }
           return { documentType, file };
@@ -424,7 +474,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
           { documents: files.map(({ documentType, file }) => ({ documentType, fileName: file.name, mimeType: file.type, fileSize: file.size })) }
         );
         if (!Array.isArray(reservations.data) || reservations.data.length !== documentTypes.length) {
-          throw new Error('The API did not reserve all four required document uploads.');
+          throw new Error('The API did not reserve all five required document uploads.');
         }
         for (const reservation of reservations.data) {
           const entry = files.find(({ documentType }) => documentType === reservation.documentType);
@@ -588,12 +638,12 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
                                 <small>Uploaded {formatDate(document.uploadedAt)}{personName(document.uploadedBy) ? ` · By ${personName(document.uploadedBy)}` : ''}</small>
                                 {Boolean(document.verifiedAt) && <small>Verified {formatDate(document.verifiedAt)}{personName(document.verifiedBy) ? ` · By ${personName(document.verifiedBy)}` : ''}</small>}
                                 {typeof document.verificationRemark === 'string' && document.verificationRemark && <small>Note: {document.verificationRemark}</small>}
+                                {roleCode === 'MIS' && <small>MIS: {readableStatus(document.misVerificationStatus ?? 'PENDING')}{typeof document.misVerificationRemark === 'string' && document.misVerificationRemark ? ` - ${document.misVerificationRemark}` : ''}</small>}
                               </span>
                               <button className="filter-btn" disabled={relatedBusy} onClick={() => void previewDocument(document)}>{documentPreview?.documentId === key ? 'Hide preview' : 'Preview'}</button>
                               <button className="filter-btn" disabled={relatedBusy} onClick={() => void downloadDocument(document)}>Download</button>
-                              <button className="filter-btn" disabled={relatedBusy || document.verificationStatus === 'VERIFIED'} onClick={() => void verifyDocument(document)}>
-                                {document.verificationStatus === 'VERIFIED' ? 'Verified' : 'Verify'}
-                              </button>
+                              {roleCode === 'MIS' && document.verificationStatus === 'VERIFIED' && String(customerContextRows('documents').find(item => item.documentType === document.documentType)?._id ?? '') === key && <><button className="filter-btn" aria-pressed={document.misVerificationStatus === 'VERIFIED'} style={document.misVerificationStatus === 'VERIFIED' ? { backgroundColor: '#15803d', borderColor: '#15803d', color: 'white', opacity: 1 } : undefined} disabled={relatedBusy || document.misVerificationStatus === 'VERIFIED'} onClick={() => void misReviewDocument(document, 'VERIFIED')}>{document.misVerificationStatus === 'VERIFIED' ? 'Verified' : 'MIS verify'}</button><button className="filter-btn" aria-pressed={document.misVerificationStatus !== 'VERIFIED' && Boolean(document.misVerificationRemark)} style={document.misVerificationStatus !== 'VERIFIED' && document.misVerificationRemark ? { backgroundColor: '#b91c1c', borderColor: '#b91c1c', color: 'white' } : undefined} disabled={relatedBusy} onClick={() => void misReviewDocument(document, 'PENDING')}>{document.misVerificationStatus !== 'VERIFIED' && document.misVerificationRemark ? 'Pending' : 'Mark pending'}</button></>}
+                              {(record?.reviewCp ? roleCode === 'RM' : roleCode !== 'CP' && roleCode !== 'MIS') && document.verificationStatus === 'PENDING' && <><button className="filter-btn" disabled={relatedBusy} onClick={() => void verifyDocument(document)}>Verify</button><button className="filter-btn" disabled={relatedBusy} onClick={() => void verifyDocument(document, 'REJECTED')}>Reject</button></>}
                             </div>
                             {documentPreview?.documentId === key && (
                               <div className="customer-document-preview">
@@ -672,6 +722,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
             {conversionNotice && <div className="success-note" role="status">{conversionNotice}</div>}
             {type === 'customers' && ['MD','CP_HEAD','RM'].includes(roleCode ?? '') && <button className="primary-btn" disabled={Boolean(record?.cpEmployee)} onClick={() => setConvertCp(true)}>{record?.cpEmployee ? 'CP account created' : 'Convert to CP'}</button>}
             {type === 'employees' && referencedId(record?.sourceCustomer) && <button className="secondary-btn" onClick={() => setCustomerHistory(true)}>Customer history</button>}
+            {Boolean(isChannelPartner) && <CpCustomers cpId={id} open={cpCustomersOpen} refreshKey={cpCustomerRefresh} onToggle={() => setCpCustomersOpen(value => !value)} onSelect={setSelectedCpCustomer}/>}
             {Boolean(isChannelPartner) && !referencedId(record?.sourceCustomer) && record.isActive !== false && ['MD','CP_HEAD','RM'].includes(roleCode ?? '') && <button className="primary-btn" onClick={() => setConvertCustomer(true)}>Convert to customer</button>}
             {type === 'customers' && ['quotations', 'amcContracts'].map(key => <section key={key}><h3>{key === 'quotations' ? 'Quotation history' : 'AMC history'}</h3>{customerContextRows(key).length ? customerContextRows(key).map((item, index) => <dl className="details-list" key={String(item._id ?? index)}>{Object.entries(item).filter(([field]) => field !== "_id").map(([field, value]) => <div className="details-item" key={field}><dt>{label(field)}</dt><dd>{display(value)}</dd></div>)}</dl>) : <p>No records yet.</p>}</section>)}
             {actionOptions[type]?.length || type === 'quotations' ? (
@@ -686,8 +737,9 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
               <form className="operation-form" onSubmit={(event) => void submitAction(event)}>
                 <h3>{actionTitle(action)}</h3>
                 <div className="modal-fields">
-                  {action === 'lead-convert' && <p className="form-hint field-wide">Upload all four required documents to convert this lead. Accepted formats: PDF, JPEG, PNG, or WebP. The server verifies each file before conversion.</p>}
-                  {actionFields[action].filter((field) => field.name !== 'nextFollowUpDate' || (action === 'lead-status' && leadStatus === 'NEED_FOLLOWUP')).map((field) => <label key={field.name}>{field.label}{action === 'employee-edit' && field.name === 'branch' ? <select name="branch" value={editBranch} disabled={branchesLoading || actionBusy} onChange={event => setEditBranch(event.target.value)}><option value="">{branchesLoading ? 'Loading branches...' : 'No branch'}</option>{branches.map(branch => <option key={branch.value} value={branch.value}>{branch.label}</option>)}</select> : field.type === 'select' ? <select name={field.name} required={field.required} defaultValue="" onChange={field.name === 'status' && action === 'lead-status' ? (event) => { setLeadStatus(event.target.value); setGenerateQuotation(false); } : undefined}><option value="">Choose…</option>{field.options?.map((option) => <option key={option} value={option}>{label(option)}</option>)}</select> : <input name={field.name} type={field.type ?? 'text'} accept={field.type === 'file' ? 'application/pdf,image/jpeg,image/png,image/webp' : undefined} required={field.required || (action === 'lead-status' && field.name === 'nextFollowUpDate')} step={field.type === 'number' ? 'any' : undefined}/>}</label>)}
+                  {action === 'lead-convert' && <p className="form-hint field-wide">Quotation details are prefilled when available. Upload the four documents and a geotag photo (JPEG, PNG or WebP).</p>}
+                  {action === 'lead-convert' && conversionLoading && <p>Loading quotation details...</p>}{action === 'lead-convert' && conversionError && <p className="form-error" role="alert">{conversionError}</p>}{action === 'lead-convert' && !conversionLoading && !conversionError && !conversionQuote && <p className="form-hint">No quotation found. Enter the project details.</p>}
+                  {!(action === 'lead-convert' && (conversionLoading || conversionError)) && actionFields[action].filter((field) => field.name !== 'nextFollowUpDate' || (action === 'lead-status' && leadStatus === 'NEED_FOLLOWUP')).map((field) => <label key={field.name}>{action === 'customer-edit' && field.name === 'ratePerKW' && record?.isFixedRate ? 'Rate' : field.label}{action === 'lead-convert' && field.type === 'select' ? <select name={field.name} required={field.required} defaultValue={String(conversionQuote?.[field.name] ?? '')}><option value="">Choose...</option>{Array.from(new Set([String(conversionQuote?.[field.name] ?? ''), ...(field.name === 'phase' ? ['1-Phase', '3-Phase'] : field.name === 'systemType' ? quotationOptions.systemTypes : field.name === 'category' ? quotationOptions.categories : field.name === 'wattsPerPanel' ? quotationOptions.wattsOptions : field.name === 'paymentMode' ? quotationOptions.paymentModes : field.name === 'panelBrand' ? quotationOptions.panelBrands : field.name === 'panelTechnology' ? quotationOptions.panelTechnologies : quotationOptions.inverters)].filter(Boolean))).map(value => <option key={value} value={value}>{value}</option>)}</select> : action === 'lead-assignment' ? <select name="assignedTo" required defaultValue="" disabled={assigneesLoading || !!assigneesError}><option value="">{assigneesLoading ? 'Loading downline...' : assigneesError || (assignees.length ? 'Choose a direct report' : 'No eligible direct reports available')}</option>{assignees.map(person => <option key={person._id} value={person._id}>{[person.firstName, person.lastName].filter(Boolean).join(' ')} ({person.employeeCode}{person.role?.name ? ` - ${person.role.name}` : ''})</option>)}</select> : action === 'employee-edit' && field.name === 'branch' ? <select name="branch" value={editBranch} disabled={branchesLoading || actionBusy} onChange={event => setEditBranch(event.target.value)}><option value="">{branchesLoading ? 'Loading branches...' : 'No branch'}</option>{branches.map(branch => <option key={branch.value} value={branch.value}>{branch.label}</option>)}</select> : field.type === 'select' ? <select name={field.name} required={field.required} defaultValue="" onChange={field.name === 'status' && action === 'lead-status' ? (event) => { setLeadStatus(event.target.value); setGenerateQuotation(false); } : undefined}><option value="">Choose…</option>{field.options?.map((option) => <option key={option} value={option}>{label(option)}</option>)}</select> : <input name={field.name} type={field.type ?? 'text'} accept={field.type === 'file' ? field.name === 'document_GEO_TAG_PHOTO' ? 'image/jpeg,image/png,image/webp' : 'application/pdf,image/jpeg,image/png,image/webp' : undefined} defaultValue={action === 'lead-convert' && field.type !== 'file' ? String(conversionQuote?.[field.name] ?? '') : undefined} required={field.required || (action === 'lead-status' && field.name === 'nextFollowUpDate')} step={field.type === 'number' ? 'any' : undefined}/>}</label>)}
                   {action === 'employee-edit' && <><p className="form-hint">Choose a branch in the current address district. The current branch stays selected unless you change it.</p>{branchError && <div className="form-error" role="alert">{branchError} <button type="button" className="filter-btn" onClick={() => setBranchReload(value => value + 1)}>Retry branches</button></div>}</>}
                   {action === 'quotation-share' && <p className="form-hint">The device share menu asks you to choose WhatsApp and the recipient. This number is only for the chat-link fallback; WhatsApp cannot pre-attach a PDF to a selected chat.</p>}
                   {action === 'lead-status' && leadStatus === 'QUOTATION_SENT' && (
@@ -697,10 +749,10 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
                     </>
                   )}
                 </div>
-                <div className="modal-actions"><button type="button" className="secondary-btn" onClick={() => setAction('')}>Cancel</button><button className="primary-btn" disabled={actionBusy || (action === 'employee-edit' && branchesLoading)}>{actionBusy ? action === 'lead-convert' ? 'Uploading & converting…' : 'Saving…' : action === 'lead-convert' ? 'Upload documents & convert' : 'Save'}</button></div>
+                <div className="modal-actions"><button type="button" className="secondary-btn" onClick={() => setAction('')}>Cancel</button><button className="primary-btn" disabled={actionBusy || (action === 'lead-convert' && (conversionLoading || !!conversionError)) || (action === 'employee-edit' && branchesLoading)}>{actionBusy ? action === 'lead-convert' ? 'Uploading & converting…' : 'Saving…' : action === 'lead-convert' ? 'Upload documents & convert' : 'Save'}</button></div>
               </form>
             )}
-            {type === 'customers' && (
+            {type === 'customers' && (!record.reviewCp || roleCode === 'CP') && (
               <form className="operation-form" onSubmit={(event) => {
                 event.preventDefault();
                 const file = new FormData(event.currentTarget).get('customerDocument');
@@ -709,22 +761,21 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
                 void (async () => {
                   setActionBusy(true); setError('');
                   try {
-                    if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 20 * 1024 * 1024) throw new Error('Choose a PDF, JPEG, PNG, or WebP file no larger than 20 MB.');
+                    if (!(documentType === 'GEO_TAG_PHOTO' ? ['image/jpeg', 'image/png', 'image/webp'] : ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']).includes(file.type) || file.size > 20 * 1024 * 1024) throw new Error('Choose a PDF, JPEG, PNG, or WebP file no larger than 20 MB.');
                     const ticket = await api.post<{ uploadId: string; uploadUrl: string }>(`/customers/${id}/documents/upload-url`, { documentType, fileName: file.name, mimeType: file.type, fileSize: file.size });
                     if (!ticket.data?.uploadId || !ticket.data.uploadUrl) throw new Error('The API did not return a valid upload reservation.');
-                    const url = new URL(ticket.data.uploadUrl);
-                    if (url.protocol !== 'https:' && url.hostname !== 'localhost') throw new Error('The upload URL must use HTTPS.');
-                    const uploaded = await fetch(url.toString(), { method: 'PUT', headers: { 'Content-Type': file.type }, body: file, credentials: 'omit', redirect: 'error' });
-                    if (!uploaded.ok) throw new Error(`Document upload failed (${uploaded.status}).`);
+                    await api.put(`/customers/${encodeURIComponent(id)}/documents/${encodeURIComponent(ticket.data.uploadId)}/upload`, file, file.type);
                     await api.post(`/customers/${id}/documents/complete`, { uploadId: ticket.data.uploadId });
+                    await loadRecord();
                     await loadRelated(`/customers/${id}/documents`);
+                    onSaved?.();
                   } catch (cause) { setError(cause instanceof Error ? cause.message : 'Document upload failed'); }
                   finally { setActionBusy(false); }
                 })();
               }}>
-                <h3>Upload customer document</h3>
+                <h3>{record.reviewCp ? 'Replace rejected document' : 'Upload customer document'}</h3>
                 <div className="modal-fields">
-                  <label>Document type<select name="documentType" required defaultValue=""><option value="">Choose document type</option>{['PAN', 'AADHAAR', 'ELECTRICITY_BILL', 'BANK_PASSBOOK'].map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></label>
+                  <label>Document type<select name="documentType" required defaultValue=""><option value="">Choose document type</option>{['PAN', 'AADHAAR', 'ELECTRICITY_BILL', 'BANK_PASSBOOK', 'GEO_TAG_PHOTO'].filter(value => !record.reviewCp || (Array.isArray(record.reviewRequiredTypes) && record.reviewRequiredTypes.includes(value) && (!customerContextRows('documents').find(doc => doc.documentType === value) || customerContextRows('documents').find(doc => doc.documentType === value)?.verificationStatus === 'REJECTED'))).map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></label>
                   <label>File (PDF or image, max 20 MB)<input name="customerDocument" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" required/></label>
                 </div>
                 <div className="modal-actions"><button className="primary-btn" disabled={actionBusy}>{actionBusy ? 'Uploading…' : 'Upload document'}</button></div>
@@ -746,9 +797,8 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
                       <span><b>{String(document.documentType ?? 'Document')}</b><small>{String(document.fileName ?? document.verificationStatus ?? '')}</small></span>
                       <button className="filter-btn" disabled={relatedBusy} onClick={() => void previewDocument(document)}>{documentPreview?.documentId === key ? 'Hide preview' : 'Preview'}</button>
                       <button className="filter-btn" disabled={relatedBusy} onClick={() => void downloadDocument(document)}>Download</button>
-                      <button className="filter-btn" disabled={relatedBusy || document.verificationStatus === 'VERIFIED'} onClick={() => void verifyDocument(document)}>
-                        {document.verificationStatus === 'VERIFIED' ? 'Verified' : 'Verify'}
-                      </button>
+                      {roleCode === 'MIS' && document.verificationStatus === 'VERIFIED' && String(customerContextRows('documents').find(item => item.documentType === document.documentType)?._id ?? '') === key && <><button className="filter-btn" aria-pressed={document.misVerificationStatus === 'VERIFIED'} style={document.misVerificationStatus === 'VERIFIED' ? { backgroundColor: '#15803d', borderColor: '#15803d', color: 'white', opacity: 1 } : undefined} disabled={relatedBusy || document.misVerificationStatus === 'VERIFIED'} onClick={() => void misReviewDocument(document, 'VERIFIED')}>{document.misVerificationStatus === 'VERIFIED' ? 'Verified' : 'MIS verify'}</button><button className="filter-btn" aria-pressed={document.misVerificationStatus !== 'VERIFIED' && Boolean(document.misVerificationRemark)} style={document.misVerificationStatus !== 'VERIFIED' && document.misVerificationRemark ? { backgroundColor: '#b91c1c', borderColor: '#b91c1c', color: 'white' } : undefined} disabled={relatedBusy} onClick={() => void misReviewDocument(document, 'PENDING')}>{document.misVerificationStatus !== 'VERIFIED' && document.misVerificationRemark ? 'Pending' : 'Mark pending'}</button></>}
+                              {(record?.reviewCp ? roleCode === 'RM' : roleCode !== 'CP' && roleCode !== 'MIS') && document.verificationStatus === 'PENDING' && <><button className="filter-btn" disabled={relatedBusy} onClick={() => void verifyDocument(document)}>Verify</button><button className="filter-btn" disabled={relatedBusy} onClick={() => void verifyDocument(document, 'REJECTED')}>Reject</button></>}
                     </div>
                     {documentPreview?.documentId === key && (
                       <div className="customer-document-preview">
@@ -863,6 +913,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
         </div>
       </section>
       {convertCp && <CustomerCpConversion customerId={id} onClose={() => setConvertCp(false)} onSaved={(sent, already) => { setConvertCp(false); setConversionNotice(already ? 'This customer already has a CP account.' : sent ? 'CP account created. Password-setup invitation sent.' : 'CP account created. Invitation was not delivered; use Employees to resend it.'); void loadRecord().catch(e => setError(e instanceof Error ? e.message : 'Unable to refresh customer')); }}/> }
+      {selectedCpCustomer && <RecordDetails type="customers" id={selectedCpCustomer} onClose={() => setSelectedCpCustomer('')} onSaved={() => { setCpCustomerRefresh(value => value + 1); onSaved?.(); }}/>}
       {customerHistory && referencedId(record?.sourceCustomer) && <RecordDetails type="customers" id={referencedId(record?.sourceCustomer)} onClose={() => setCustomerHistory(false)}/>}
       {convertCustomer && <CpCustomerConversion cpId={id} onClose={() => setConvertCustomer(false)} onSaved={() => { setConvertCustomer(false); setConversionNotice('Customer created and linked to this channel partner.'); onSaved?.(); void loadRecord().catch(e => setError(e instanceof Error ? e.message : 'Unable to refresh channel partner')); }}/>}
     </div>
