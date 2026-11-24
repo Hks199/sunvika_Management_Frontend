@@ -18,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => { (async () => { if (await refreshAccessToken()) { try { await reload(); } catch { tokenStore.set(null); } } setLoading(false); })(); }, [reload]);
   const signIn = useCallback(async (email: string, password: string) => {
-    const result = await api.post<{ accessToken?: string; employee?: User; user?: User }>('/auth/login', { email, password });
+    const result = await api.post<{ accessToken?: string; employee?: User; user?: User }>('/auth/login', { identifier: email.trim(), password });
     tokenStore.set(result.data.accessToken ?? null);
     if (!tokenStore.get()) throw new Error('The API did not return an access token.');
     try { await reload(); } catch { setUser(userFrom(result.data)); }
