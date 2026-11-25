@@ -11,6 +11,7 @@ function number(value: unknown) { return typeof value === 'number' && Number.isF
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const isCp = (typeof user?.role==='string'?user.role:user?.role?.code)==='CP';
   const [summary, setSummary] = useState<RecordValue | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -73,10 +74,10 @@ export default function Dashboard() {
         <div className="panel-heading"><div><h2>Today’s focus</h2><p>Open your live work queues</p></div><span className="focus-icon"><Activity size={17}/></span></div>
         <div className="focus-list">
           <Link to="/leads"><span className="focus-bullet green"><CalendarClock size={17}/></span><span><b>Lead follow-ups</b><small>Review upcoming and overdue follow-ups</small></span><span className="focus-count">→</span></Link>
-          <Link to="/employees"><span className="focus-bullet blue"><BriefcaseBusiness size={17}/></span><span><b>Team activity</b><small>View employees and reporting hierarchy</small></span><span className="focus-count">→</span></Link>
-          <Link to="/amc"><span className="focus-bullet amber"><BadgeCheck size={17}/></span><span><b>Service renewals</b><small>Review upcoming AMC renewals and service</small></span><span className="focus-count">→</span></Link>
+          {!isCp && <Link to="/employees"><span className="focus-bullet blue"><BriefcaseBusiness size={17}/></span><span><b>Team activity</b><small>View employees and reporting hierarchy</small></span><span className="focus-count">→</span></Link>}
+          {!isCp && <Link to="/amc"><span className="focus-bullet amber"><BadgeCheck size={17}/></span><span><b>Service renewals</b><small>Review upcoming AMC renewals and service</small></span><span className="focus-count">→</span></Link>}
         </div>
-        <Link to="/reports" className="text-link">Explore reports <ArrowUpRight size={15}/></Link>
+        {!isCp && <Link to="/reports" className="text-link">Explore reports <ArrowUpRight size={15}/></Link>}
       </article>
     </section>
     <div className="dashboard-lower">
