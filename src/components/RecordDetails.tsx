@@ -1,4 +1,5 @@
 import CpCustomers from './CpCustomers';
+import CpIdentityDocuments from './CpIdentityDocuments';
 import type { Policy } from './QuotationPolicy';
 import { QuotationOptions, type Options } from './QuotationOptions';
 import EmployeeProfileImageEditor from './EmployeeProfileImageEditor';
@@ -597,6 +598,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
                 <button className="filter-btn" onClick={() => void directAction('employee-image')}>Refresh image</button>
               </section>
             )}
+            {isChannelPartner && <CpIdentityDocuments employeeId={id}/>}
             {type === 'employees' && <EmployeeProfileImageEditor key={id} employeeId={id} onSaved={async()=>{await loadRecord();onSaved?.();}}/>}
             <dl className="details-list">
               {fields.map(([key, value]) => (
