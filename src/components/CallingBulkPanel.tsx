@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 type Settings = { enabled: boolean; skipUnfinished: boolean };
 type Batch = { _id: string; title: string; allocationState?: string; allocationDistrict?: string; state: string; candidateCount: number; sheetCount: number; error: string };
-export default function CallingBulkPanel({ refreshKey, allocationState, allocationDistrict, states, districts }: { refreshKey: number; allocationState: string; allocationDistrict: string; states: { _id:string; name:string }[]; districts: { _id:string; name:string }[] }) {
+export default function CallingBulkPanel({ refreshKey }: { refreshKey: number }) {
+  const [states,setStates]=useState<{_id:string;name:string}[]>([]);
+  useEffect(()=>{void api.get<{_id:string;name:string}[]>('/geography/states').then(r=>setStates(r.data)).catch(()=>{});},[]);
   const [allDistricts,setAllDistricts]=useState<{_id:string;name:string}[]>([]);
   useEffect(()=>{void api.get<{_id:string;name:string}[]>('/geography/districts').then(r=>setAllDistricts(r.data)).catch(()=>{});},[]);
   const [settings, setSettings] = useState<Settings | null>(null), [batches, setBatches] = useState<Batch[]>([]);
@@ -14,7 +16,6 @@ export default function CallingBulkPanel({ refreshKey, allocationState, allocati
   }, [page]);
   useEffect(() => { void load(); }, [load, refreshKey]);
   async function save() { if (!settings) return; setBusy(true); setError(''); setNotice(''); try { await api.patch('/calling-lists/distribution', { enabled: settings.enabled, skipUnfinished: settings.skipUnfinished }); setNotice('Daily distribution settings saved.'); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save settings'); } finally { setBusy(false); } }
-  async function labelBatch(id:string) { if(!allocationState||!allocationDistrict)return;setBusy(true);setError('');try{await api.patch(`/calling-lists/batches/${id}/location`,{allocationState,allocationDistrict});await load();}catch(e){setError(e instanceof Error?e.message:'Unable to set location');}finally{setBusy(false);} }
   async function retry(id: string) { setBusy(true); setError(''); try { await api.post(`/calling-lists/batches/${id}/retry`); await load(); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to retry batch'); } finally { setBusy(false); } }
   return <section className="panel calling-panel"><h2>Daily allocation when RM is active</h2><p>Unassigned candidate details stay in private S3 files. They enter the database only when assigned to an RM. Refresh manually to see import progress.</p>
     {settings && <form onSubmit={event => { event.preventDefault(); void save(); }}><fieldset disabled={busy} className="calling-fieldset"><div className="modal-fields">
@@ -22,7 +23,7 @@ export default function CallingBulkPanel({ refreshKey, allocationState, allocati
     </div><button className="primary-btn">Save allocation settings</button></fieldset></form>}
     {error && <div className="form-error" role="alert">{error}</div>}{notice && <p role="status">{notice}</p>}
     <div className="panel-heading"><h3>Upload batches ({total})</h3><button type="button" className="secondary-btn" disabled={busy} onClick={() => void load()}>Refresh batches</button></div>
-    {batches.map(batch => <div key={batch._id} className="panel-heading"><div><b>{batch.title}</b><p>Location: {states.find(x=>x._id===batch.allocationState)?.name || batch.allocationState || 'Not set'} / {(allDistricts.length?allDistricts:districts).find(x=>x._id===batch.allocationDistrict)?.name || batch.allocationDistrict || 'Not set'}</p>{(!batch.allocationState || !batch.allocationDistrict) && batch.state === 'READY' && <p>Select state and district under “Set location for an older batch” above, then <button className="secondary-btn" disabled={busy||!allocationState||!allocationDistrict} onClick={()=>void labelBatch(batch._id)}>Set selected location</button></p>}<p>{batch.state} · {batch.candidateCount.toLocaleString()} candidates processed · {batch.sheetCount.toLocaleString()} sheets{batch.error ? ` · ${batch.error}` : ''}</p></div>{batch.state === 'FAILED' && <button className="secondary-btn" disabled={busy} onClick={() => void retry(batch._id)}>Retry processing</button>}</div>)}
+    {batches.map(batch => <div key={batch._id} className="panel-heading"><div><b>{batch.title}</b><p>Location: {states.find(x=>x._id===batch.allocationState)?.name || batch.allocationState || 'Not set'} / {allDistricts.find(x=>x._id===batch.allocationDistrict)?.name || batch.allocationDistrict || 'Not set'}</p><p>{batch.state} · {batch.candidateCount.toLocaleString()} candidates processed · {batch.sheetCount.toLocaleString()} sheets{batch.error ? ` · ${batch.error}` : ''}</p></div>{batch.state === 'FAILED' && <button className="secondary-btn" disabled={busy} onClick={() => void retry(batch._id)}>Retry processing</button>}</div>)}
     {!batches.length && <p>No upload batches yet.</p>}<div className="calling-pagination"><button className="secondary-btn" disabled={busy || page === 1} onClick={() => setPage(v => v - 1)}>Previous batches</button><span>Page {page}</span><button className="secondary-btn" disabled={busy || page * 10 >= total} onClick={() => setPage(v => v + 1)}>Next batches</button></div>
   </section>;
 }
