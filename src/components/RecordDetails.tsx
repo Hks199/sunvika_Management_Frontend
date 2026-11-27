@@ -1,3 +1,4 @@
+import TeamTransfer from './TeamTransfer';
 import CpCustomers from './CpCustomers';
 import CpIdentityDocuments from './CpIdentityDocuments';
 import type { Policy } from './QuotationPolicy';
@@ -599,6 +600,7 @@ export default function RecordDetails({ type, id, onClose, channelPartner = fals
               </section>
             )}
             {isChannelPartner && <CpIdentityDocuments employeeId={id}/>}
+            {type === 'employees' && ((roleCode === 'MD' && (role === 'RM' || role === 'CP_HEAD' || (role && typeof role === 'object' && 'code' in role && (role.code === 'RM' || role.code === 'CP_HEAD')))) || (roleCode === 'CP_HEAD' && (role === 'RM' || (role && typeof role === 'object' && 'code' in role && role.code === 'RM')))) && <TeamTransfer employeeId={id} onSaved={onSaved}/>}
             {type === 'employees' && <EmployeeProfileImageEditor key={id} employeeId={id} onSaved={async()=>{await loadRecord();onSaved?.();}}/>}
             <dl className="details-list">
               {fields.map(([key, value]) => (
