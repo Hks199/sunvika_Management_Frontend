@@ -11,7 +11,9 @@ function number(value: unknown) { return typeof value === 'number' && Number.isF
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const isCp = (typeof user?.role==='string'?user.role:user?.role?.code)==='CP';
+  const roleCode = typeof user?.role==='string'?user.role:user?.role?.code;
+  const isCp = roleCode==='CP';
+  const canSeeCpFollowups = ['MD','CP_HEAD','RM'].includes(roleCode??'');
   const [summary, setSummary] = useState<RecordValue | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,7 @@ export default function Dashboard() {
       <div><div className="eyebrow">YOUR BUSINESS AT A GLANCE</div><h1>{greeting}, {user?.firstName || 'there'} <span className="wave">✳</span></h1><p>Live totals and branch performance within your account scope.</p></div>
       <button className="secondary-btn" onClick={() => void load()} disabled={loading}><RefreshCw size={15} className={loading ? 'spin' : ''}/>{loading ? 'Updating' : 'Refresh'}</button>
     </div>
+    {canSeeCpFollowups && <Link to="/cp-followups" className="dashboard-cp-followup-link"><span className="dashboard-cp-followup-icon"><CalendarClock size={21}/></span><span className="dashboard-cp-followup-copy"><b>CP follow-ups</b><small>View RM follow-up reports and partner status</small></span><span className="dashboard-cp-followup-action">Open follow-ups <ArrowUpRight size={16}/></span></Link>}
     {error && <div className="notice-error" role="alert">{error}</div>}
     <section className="metric-grid">
       {metrics.map(([title, value, Icon], index) => <article className={`metric-card tone-${index}`} key={title}>
@@ -84,6 +87,7 @@ export default function Dashboard() {
       <article className="panel welcome-panel"><div className="welcome-art"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="welcome-sun"><span/></div><div className="floating-card card-a">Live<small>Workspace</small></div><div className="floating-card card-b">✓<small>Scoped</small></div></div><div className="welcome-copy"><div className="eyebrow">ONE TEAM, ONE VIEW</div><h2>Make every interaction count.</h2><p>Follow the customer journey from lead to quotation, service, and long-term support.</p></div></article>
       <div className="quick-grid">
         <Link className="quick-card" to="/leads"><span className="quick-icon mint"><ContactRound size={19}/></span><b>Work leads</b><small>Review your pipeline</small><ArrowUpRight size={15} className="quick-arrow"/></Link>
+        {canSeeCpFollowups && <Link className="quick-card" to="/cp-followups"><span className="quick-icon mint"><CalendarClock size={19}/></span><b>CP follow-ups</b><small>Review partner follow-ups</small><ArrowUpRight size={15} className="quick-arrow"/></Link>}
         <Link className="quick-card" to="/customers"><span className="quick-icon lavender"><Users size={19}/></span><b>Customer book</b><small>Manage relationships</small><ArrowUpRight size={15} className="quick-arrow"/></Link>
       </div>
     </div>
