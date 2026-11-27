@@ -1,6 +1,6 @@
 export const cpCustomerDocuments = ['PAN', 'AADHAAR', 'ELECTRICITY_BILL', 'BANK_PASSBOOK'] as const;
 export type CpCustomerDocument = typeof cpCustomerDocuments[number];
-export type CpCustomerOptions = { customerId: string | null; defaults: Record<string, string> };
+export type CpCustomerOptions = { customerId: string | null; existingDocuments: CpCustomerDocument[]; defaults: Record<string, string> };
 export type CustomerPlace = { _id: string; name: string };
 export const cpCustomerFields = [
   ['customerName', 'Customer name', 'text', 160], ['mobileNumber', 'Mobile number', 'tel', 16],
